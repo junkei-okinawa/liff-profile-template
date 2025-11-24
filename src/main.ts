@@ -1,0 +1,87 @@
+import liff from '@line/liff';
+import { renderProfile } from './pages/Profile';
+import { renderTerms } from './pages/Terms';
+import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer } from './pages/Unsubscribe';
+import './style.css';
+
+const app = document.getElementById('app') as HTMLElement;
+
+// Router function
+const router = async (): Promise<void> => {
+    // Clean up any running timers from previous pages
+    cleanupUnsubscribeTimer();
+
+    const path = window.location.pathname;
+
+    if (path.startsWith('/profile/')) {
+        await renderProfile(app);
+    } else if (path === '/terms-of-use') {
+        await renderTerms(app);
+    } else if (path === '/unsubscribe') {
+        await renderUnsubscribe(app);
+    } else if (path === '/unsubscribe/complete') {
+        renderUnsubscribeComplete(app);
+    } else if (path === '/api/auth/callback/line') {
+        // Handle LINE Login callback path by redirecting to profile
+        window.history.replaceState({}, '', '/profile/me');
+        await renderProfile(app);
+    } else {
+        // Default route
+        if (path === '/' || path === '/index.html') {
+            // If logged in, redirect to profile/me (which will resolve to real user ID)
+            window.history.replaceState({}, '', '/profile/me');
+            await renderProfile(app);
+        } else {
+            app.innerHTML = '<h1>404 - Page Not Found</h1>';
+        }
+    }
+};
+
+// Initialize LIFF
+const initLiff = async (): Promise<void> => {
+    try {
+        const liffId = import.meta.env.VITE_CHANNEL_ID;
+
+        if (!liffId) {
+            throw new Error('VITE_CHANNEL_ID is not defined in .env');
+        }
+
+        await liff.init({ liffId });
+
+        // Check if user is logged in and has context
+        if (!liff.isLoggedIn()) {
+            liff.login({ redirectUri: import.meta.env.VITE_CALLBACK_URL || window.location.href });
+            return;
+        }
+
+        const context = liff.getContext();
+        if (!context || !context.userId) {
+            // If getContext is null (likely in external browser), try to get profile as fallback.
+            try {
+                const profile = await liff.getProfile();
+                // If getProfile succeeds, we have a valid user session.
+                // Note: We don't store the profile here, just verifying we can get it.
+                // The pages will fetch what they need.
+                console.log('Context not found but profile retrieved:', profile.userId);
+            } catch (e) {
+                // If getProfile also fails, show error or force login as last resort.
+                console.warn('No context/userId and getProfile failed, redirecting to login...', e);
+                liff.login({ redirectUri: import.meta.env.VITE_CALLBACK_URL || window.location.href });
+                return;
+            }
+        }
+
+        // If we have context, proceed to router
+        router();
+
+    } catch (error) {
+        console.error('LIFF Init failed', error);
+        app.innerHTML = `<div class="container"><p style="color:red">LIFFの初期化中にエラーが発生しました。しばらくしてから再度お試しください。</p></div>`;
+    }
+};
+
+// Handle navigation
+window.addEventListener('popstate', router);
+
+// Start
+initLiff();
