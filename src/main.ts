@@ -13,9 +13,9 @@ const router = async (): Promise<void> => {
     if (path.startsWith('/profile/')) {
         await renderProfile(app);
     } else if (path === '/terms-of-use') {
-        renderTerms(app);
+        await renderTerms(app);
     } else if (path === '/unsubscribe') {
-        renderUnsubscribe(app);
+        await renderUnsubscribe(app);
     } else if (path === '/unsubscribe/complete') {
         renderUnsubscribeComplete(app);
     } else if (path === '/api/auth/callback/line') {

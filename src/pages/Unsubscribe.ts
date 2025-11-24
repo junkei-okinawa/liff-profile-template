@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import liff from '@line/liff';
 
 export const renderUnsubscribe = async (container: HTMLElement): Promise<void> => {
@@ -10,7 +11,8 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       throw new Error('コンテンツの読み込みに失敗しました');
     }
     const text = await response.text();
-    const htmlContent = marked.parse(text);
+    const parsedHtml = await marked.parse(text);
+    const htmlContent = DOMPurify.sanitize(parsedHtml);
 
     const html = `
       <div class="terms-container">
@@ -50,12 +52,22 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       };
     }
 
-  } catch (error: any) {
-    container.innerHTML = `<div class="container"><p style="color:red">エラー: ${error.message}</p></div>`;
+  } catch (error: unknown) {
+    console.error('Unsubscribe page error:', error);
+    container.innerHTML = `<div class="container"><p style="color:red">ページの表示中にエラーが発生しました。</p></div>`;
   }
 };
 
+// Global variable to track the interval so it can be cleaned up
+let countdownInterval: ReturnType<typeof setInterval> | null = null;
+
 export const renderUnsubscribeComplete = (container: HTMLElement): void => {
+  // Clean up any existing interval before starting a new one
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+
   let countdown = 3;
 
   const render = () => {
@@ -72,10 +84,13 @@ export const renderUnsubscribeComplete = (container: HTMLElement): void => {
 
   render();
 
-  const interval = setInterval(() => {
+  countdownInterval = setInterval(() => {
     countdown--;
     if (countdown <= 0) {
-      clearInterval(interval);
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
       if (liff.isLoggedIn()) {
         liff.logout();
       }

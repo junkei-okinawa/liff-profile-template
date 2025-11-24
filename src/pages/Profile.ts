@@ -99,7 +99,9 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
       };
     }
 
-  } catch (error: any) {
-    container.innerHTML = `<div class="container"><p style="color:red">エラー: ${error.message}</p></div>`;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Profile rendering error:', error);
+    container.innerHTML = `<div class="container"><p style="color:red">エラー: ${message}</p></div>`;
   }
 };

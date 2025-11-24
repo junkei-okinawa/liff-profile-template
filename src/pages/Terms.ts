@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import liff from '@line/liff';
 
 export const renderTerms = async (container: HTMLElement): Promise<void> => {
@@ -11,7 +12,8 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
             throw new Error('規約の読み込みに失敗しました');
         }
         const text = await response.text();
-        const htmlContent = marked.parse(text);
+        const parsedHtml = await marked.parse(text);
+        const htmlContent = DOMPurify.sanitize(parsedHtml);
 
         const html = `
       <div class="terms-container">
@@ -43,8 +45,9 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
         // 2. Check Agreement Status via API
         await checkAgreementStatus(container);
 
-    } catch (error: any) {
-        container.innerHTML = `<div class="container"><p style="color:red">エラー: ${error.message}</p></div>`;
+    } catch (error: unknown) {
+        console.error('Terms rendering error:', error);
+        container.innerHTML = `<div class="container"><p style="color:red">規約の表示中にエラーが発生しました。</p></div>`;
     }
 };
 
@@ -62,28 +65,38 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                     const profile = await liff.getProfile();
                     userId = profile.userId;
                 } catch (e) {
-                    console.warn('Could not get userId for terms check');
+                    console.warn('Could not get userId from context or profile for terms check', e);
                 }
             }
         }
 
-        if (userId) {
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-            if (!apiBaseUrl) {
-                console.error('API Base URL not configured');
-                hasAgreed = false;
-            } else {
-                const response = await fetch(`${apiBaseUrl}/api/users/${userId}/status`);
-                if (!response.ok) {
-                    throw new Error(`API Error: ${response.status}`);
-                }
-                const data = await response.json();
-                hasAgreed = data.agreed;
-            }
+        // Validate userId
+        if (!userId || userId.trim() === '') {
+            throw new Error('Invalid user ID: User ID could not be retrieved.');
         }
+
+        // Fetch user agreement status from Backend API
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+        if (!apiBaseUrl) {
+            throw new Error('API base URL is not configured');
+        }
+
+        const statusResponse = await fetch(`${apiBaseUrl}/api/users/${encodeURIComponent(userId)}/status`);
+        if (!statusResponse.ok) {
+            throw new Error(`Failed to fetch user status: ${statusResponse.statusText} (Status: ${statusResponse.status})`);
+        }
+
+        const statusData = await statusResponse.json();
+        hasAgreed = statusData.agreed;
+
     } catch (e) {
         console.error('API check failed', e);
-        hasAgreed = false;
+        hasAgreed = false; // Ensure hasAgreed is false on error
+        const agreementSection = container.querySelector('#agreement-section');
+        if (agreementSection) {
+            agreementSection.innerHTML = `<p style="color: red;">同意状況の確認中にエラーが発生しました: ${e instanceof Error ? e.message : String(e)}</p>`;
+        }
+        return; // Exit early if there's an error
     }
 
     const agreementSection = container.querySelector('#agreement-section');
