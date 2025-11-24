@@ -53,10 +53,10 @@ const initLiff = async (): Promise<void> => {
 
         const context = liff.getContext();
         if (!context || !context.userId) {
-            // If no context/userId, force login again or show error
+            // If no context/userId, force login again.
             // Sometimes getContext is null if not opened in LINE, but isLoggedIn is true.
-            // In that case, we might need to rely on getProfile() later, but requirements say use getContext.
-            // If getContext fails, we can try login.
+            // In that case, we force a login to try to recover context as per requirements.
+            // (If login fails, error will be handled in the catch block below.)
             console.warn('No context or userId found, redirecting to login...');
             liff.login({ redirectUri: import.meta.env.VITE_CALLBACK_URL || window.location.href });
             return;
