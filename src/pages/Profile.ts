@@ -7,6 +7,16 @@ interface Profile {
   userId?: string;
 }
 
+// Utility function to escape HTML to prevent XSS
+const escapeHtml = (unsafe: string): string => {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 export const renderProfile = async (container: HTMLElement): Promise<void> => {
   container.innerHTML = '<div class="loading">プロフィールを読み込み中...</div>';
 
@@ -35,28 +45,28 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
     }
 
     const pictureHtml = profile.pictureUrl
-      ? `<img src="${profile.pictureUrl}" alt="Profile" class="profile-image">`
+      ? `<img src="${escapeHtml(profile.pictureUrl)}" alt="Profile" class="profile-image">`
       : `<div class="profile-image" style="display:flex;align-items:center;justify-content:center;font-size:2rem;color:#888;">?</div>`;
 
     const html = `
       <div class="profile-header">
         ${pictureHtml}
-        <h1 class="profile-name">${profile.displayName}</h1>
-        <div class="profile-status">${profile.statusMessage || ''}</div>
+        <h1 class="profile-name">${escapeHtml(profile.displayName)}</h1>
+        <div class="profile-status">${escapeHtml(profile.statusMessage || '')}</div>
       </div>
       
       <div class="info-card">
         <div class="info-item">
           <span class="info-label">ユーザーID</span>
-          <span class="info-value">${profile.userId || 'N/A'}</span>
+          <span class="info-value">${escapeHtml(profile.userId || 'N/A')}</span>
         </div>
         <div class="info-item">
           <span class="info-label">言語</span>
-          <span class="info-value">${liff.getAppLanguage() || 'ja'}</span>
+          <span class="info-value">${escapeHtml(liff.getAppLanguage() || 'ja')}</span>
         </div>
         <div class="info-item">
           <span class="info-label">OS</span>
-          <span class="info-value">${liff.getOS() || 'web'}</span>
+          <span class="info-value">${escapeHtml(liff.getOS() || 'web')}</span>
         </div>
       </div>
       

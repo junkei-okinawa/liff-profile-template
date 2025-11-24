@@ -156,9 +156,9 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
         if (agreementSection) {
             agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意済みです</p>';
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Agreement failed', e);
-        alert(`エラーが発生しました: ${e.message}. もう一度お試しください。`);
+        alert('規約への同意処理中にエラーが発生しました。もう一度お試しください。');
         btn.disabled = false;
         btn.textContent = '規約に同意する';
     }
