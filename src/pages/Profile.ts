@@ -7,15 +7,11 @@ interface Profile {
   userId?: string;
 }
 
-export const renderProfile = async (container: HTMLElement, _userId: string): Promise<void> => {
+export const renderProfile = async (container: HTMLElement): Promise<void> => {
   container.innerHTML = '<div class="loading">プロフィールを読み込み中...</div>';
 
   try {
-    let profile: Profile = {
-      displayName: '読み込み中...',
-      statusMessage: '',
-      pictureUrl: ''
-    };
+    let profile: Profile;
 
     // Use LIFF data
     if (liff.isInClient() || liff.isLoggedIn()) {

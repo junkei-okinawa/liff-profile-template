@@ -77,6 +77,5 @@ LIFF/
 | 変数名 | 説明 |
 | :--- | :--- |
 | `VITE_CHANNEL_ID` | LIFF ID (LINE Developersコンソールで取得) |
-| `VITE_CHANNEL_SECRET` | Channel Secret (※クライアントサイドでの利用はセキュリティリスクがあるため要注意) |
 | `VITE_CALLBACK_URL` | LINEログイン後のコールバックURL |
 | `VITE_API_BASE_URL` | バックエンドAPIのベースURL (例: `http://localhost:8080`) |

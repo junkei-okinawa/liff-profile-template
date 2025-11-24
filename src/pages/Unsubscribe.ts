@@ -43,7 +43,7 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     if (unsubscribeBtn) {
       unsubscribeBtn.onclick = () => {
         // TODO: 退会処理を実装する
-        // 退会処理が完了したら、後続の大会完了画面への遷移を実行する
+        // 退会処理が完了したら、後続の退会完了画面への遷移を実行する
         // Navigate to completion page
         window.history.pushState({}, '', '/unsubscribe/complete');
         window.dispatchEvent(new Event('popstate'));

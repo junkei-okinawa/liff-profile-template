@@ -41,7 +41,6 @@ cp .env.template .env
 `.env` ファイルの内容（例）:
 ```env
 VITE_CHANNEL_ID=YOUR_LIFF_ID
-VITE_CHANNEL_SECRET=YOUR_CHANNEL_SECRET
 VITE_CALLBACK_URL=http://localhost:3000/api/auth/callback/line
 VITE_API_BASE_URL=http://localhost:8080
 ```
