@@ -66,13 +66,14 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                     userId = profile.userId;
                 } catch (e) {
                     console.warn('Could not get userId from context or profile for terms check', e);
+                    throw new Error('ユーザーIDの取得に失敗しました。LINEログイン状態を確認してください。');
                 }
             }
         }
 
         // Validate userId
         if (!userId || userId.trim() === '') {
-            throw new Error('Invalid user ID: User ID could not be retrieved.');
+            throw new Error('無効なユーザーID: ユーザーIDを取得できませんでした。');
         }
 
         // Fetch user agreement status from Backend API
@@ -91,10 +92,10 @@ const checkAgreementStatus = async (container: HTMLElement) => {
 
     } catch (e) {
         console.error('API check failed', e);
-        hasAgreed = false; // Ensure hasAgreed is false on error
+        // hasAgreed is initialized to false, so no need to set it here if we return early
         const agreementSection = container.querySelector('#agreement-section');
         if (agreementSection) {
-            agreementSection.innerHTML = `<p style="color: red;">同意状況の確認中にエラーが発生しました: ${e instanceof Error ? e.message : String(e)}</p>`;
+            agreementSection.innerHTML = `<p style="color: red;">同意状況の確認中にエラーが発生しました。</p>`;
         }
         return; // Exit early if there's an error
     }
@@ -104,21 +105,18 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         if (hasAgreed) {
             agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意済みです</p>';
         } else {
-            if (userId) {
-                agreementSection.innerHTML = `
+            // userId is guaranteed to be present here due to validation above
+            agreementSection.innerHTML = `
           <button id="agree-btn" style="padding: 12px 24px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-bottom: 10px;">
             規約に同意する
           </button>
         `;
 
-                const agreeBtn = document.getElementById('agree-btn');
-                if (agreeBtn) {
-                    agreeBtn.onclick = async () => {
-                        await handleAgreement(agreeBtn as HTMLButtonElement, userId, container);
-                    };
-                }
-            } else {
-                agreementSection.innerHTML = '<p style="color: red;">ユーザー情報を取得できませんでした。再読み込みしてください。</p>';
+            const agreeBtn = document.getElementById('agree-btn');
+            if (agreeBtn) {
+                agreeBtn.onclick = async () => {
+                    await handleAgreement(agreeBtn as HTMLButtonElement, userId, container);
+                };
             }
         }
     }

@@ -61,6 +61,13 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
 // Global variable to track the interval so it can be cleaned up
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
+export const cleanupUnsubscribeTimer = (): void => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+};
+
 export const renderUnsubscribeComplete = (container: HTMLElement): void => {
   // Clean up any existing interval before starting a new one
   if (countdownInterval) {
