@@ -10,9 +10,10 @@
 - **Build Tool**: Vite
 - **SDK**:
     - `@line/liff`: LINEログインおよびプロフィール取得
-    - `firebase`: Firestore連携
     - `marked`: Markdownレンダリング
 - **CSS**: Vanilla CSS
+- **Backend**:
+    - `apps/ai-processor`: ユーザー同意状況管理API (FastAPI)
 
 ## 2. ディレクトリ構成
 
@@ -26,7 +27,6 @@ LIFF/
 │   │   ├── Profile.ts    # プロフィール画面ロジック
 │   │   ├── Terms.ts      # 利用規約画面ロジック
 │   │   └── Unsubscribe.ts# 退会画面ロジック
-│   ├── firebase-config.ts# Firebase設定
 │   ├── main.ts           # エントリーポイント・ルーティング
 │   ├── style.css         # グローバルスタイル
 │   └── vite-env.d.ts     # 型定義
@@ -52,12 +52,23 @@ LIFF/
 
 ## 4. データ設計 (Firestore)
 
+**注意**: LIFFアプリからFirestoreへの直接アクセスは行わない。全てのデータ操作は `apps/ai-processor` のAPIを経由する。
+
 ### Users Collection (`users`)
 ユーザーごとの同意状況等を管理する。
 
 | Document ID | Field Name | Type | Description |
 | :--- | :--- | :--- | :--- |
 | `{userId}` | `terms_accepted_at` | Timestamp | 利用規約に同意した日時。未同意の場合はフィールドが存在しないかnull。 |
+
+## 5. API設計 (Backend)
+
+`apps/ai-processor` が提供するAPIエンドポイント。
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| GET | `/api/users/{userId}/status` | 規約同意状況を取得する。 |
+| POST | `/api/users/{userId}/agreement` | 規約に同意する。 |
 
 ## 5. 環境変数
 
@@ -68,3 +79,4 @@ LIFF/
 | `VITE_CHANNEL_ID` | LIFF ID (LINE Developersコンソールで取得) |
 | `VITE_CHANNEL_SECRET` | Channel Secret (※クライアントサイドでの利用はセキュリティリスクがあるため要注意) |
 | `VITE_CALLBACK_URL` | LINEログイン後のコールバックURL |
+| `VITE_API_BASE_URL` | バックエンドAPIのベースURL (例: `http://localhost:8080`) |

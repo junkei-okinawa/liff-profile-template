@@ -9,8 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@line/liff": "^2.23.1",
-    "firebase": "^12.6.0",
+    "@line/liff": "2.27.3",
     "marked": "^17.0.1"
   },
   "devDependencies": {

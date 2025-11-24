@@ -31,16 +31,20 @@ npm install
 cp .env.template .env
 ```
 
+**設定値の取得元:**
+- **LINE関連**: LINE Developers Console
+- **Backend API関連**:
+    - `VITE_API_BASE_URL`: `apps/ai-processor` のURL（ローカル開発時は `http://localhost:8080`）
+
+**注意**: `.env` ファイルは Git 管理対象外（`.gitignore` に記述済み）です。リポジトリにはコミットしないでください。
+
 `.env` ファイルの内容（例）:
 ```env
 VITE_CHANNEL_ID=YOUR_LIFF_ID
 VITE_CHANNEL_SECRET=YOUR_CHANNEL_SECRET
 VITE_CALLBACK_URL=http://localhost:3000/api/auth/callback/line
+VITE_API_BASE_URL=http://localhost:8080
 ```
-
-各値は LINE Developers コンソールおよび Firebase コンソールから取得する。
-
-また、`src/firebase-config.ts` 内の `firebaseConfig` オブジェクトを自身のFirebaseプロジェクトの設定値に書き換える必要がある。
 
 ## 3. ローカル開発サーバーの起動
 
@@ -73,6 +77,9 @@ firebase deploy --only hosting
 ```
 
 ## 6. 注意事項
+
+- `src/pages/Unsubscribe.ts` 内の退会処理には `TODO` コメントが残されている。バックエンドAPIとの連携が必要な場合はここに実装を追加すること。
+
 ## 7. 参考リファレンス
 
 開発にあたっては、以下の公式リファレンスを参照すること。
