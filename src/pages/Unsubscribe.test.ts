@@ -33,6 +33,9 @@ describe('Unsubscribe Page', () => {
     // Reset mocks
     vi.clearAllMocks();
     
+    // Suppress console.error for expected errors
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     // Setup global fetch
     global.fetch = vi.fn();
     

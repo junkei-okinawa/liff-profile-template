@@ -30,6 +30,9 @@ describe('Profile Page', () => {
     // Reset mocks
     vi.clearAllMocks();
     
+    // Suppress console.error for expected errors
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     // Default LIFF mock setup
     (liff.isInClient as any).mockReturnValue(true);
     (liff.isLoggedIn as any).mockReturnValue(true);

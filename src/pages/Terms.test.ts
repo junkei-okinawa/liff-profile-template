@@ -39,6 +39,9 @@ describe('Terms Page', () => {
     // Reset mocks
     vi.clearAllMocks();
     
+    // Suppress console.error for expected errors
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     // Setup environment variables
     vi.stubEnv('VITE_API_BASE_URL', mockApiBaseUrl);
     
