@@ -82,7 +82,16 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             throw new Error('API base URL is not configured');
         }
 
-        const statusResponse = await fetch(`${apiBaseUrl}/api/users/${encodeURIComponent(userId)}/status`);
+        const idToken = liff.getIDToken();
+        if (!idToken) {
+            throw new Error('認証トークンの取得に失敗しました。再ログインしてください。');
+        }
+
+        const statusResponse = await fetch(`${apiBaseUrl}/api/users/${encodeURIComponent(userId)}/status`, {
+            headers: {
+                'Authorization': `Bearer ${idToken}`
+            }
+        });
         if (!statusResponse.ok) {
             throw new Error(`Failed to fetch user status: ${statusResponse.statusText} (Status: ${statusResponse.status})`);
         }
@@ -137,10 +146,16 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
             throw new Error('API Base URL not configured');
         }
 
+        const idToken = liff.getIDToken();
+        if (!idToken) {
+            throw new Error('認証トークンの取得に失敗しました。再ログインしてください。');
+        }
+
         const response = await fetch(`${apiBaseUrl}/api/users/${userId}/agreement`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({ agreed: true })
         });
