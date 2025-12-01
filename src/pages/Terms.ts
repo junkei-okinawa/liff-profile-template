@@ -51,6 +51,14 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
     }
 };
 
+const getAuthToken = (): string => {
+    const idToken = liff.getIDToken();
+    if (!idToken) {
+        throw new Error('認証トークンの取得に失敗しました。再ログインしてください。');
+    }
+    return idToken;
+};
+
 const checkAgreementStatus = async (container: HTMLElement) => {
     let userId = '';
     let hasAgreed = false;
@@ -82,7 +90,14 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             throw new Error('API base URL is not configured');
         }
 
-        const statusResponse = await fetch(`${apiBaseUrl}/api/users/${encodeURIComponent(userId)}/status`);
+        const idToken = getAuthToken();
+        const authorizationHeader = `Bearer ${idToken}`;
+
+        const statusResponse = await fetch(`${apiBaseUrl}/api/users/${encodeURIComponent(userId)}/status`, {
+            headers: {
+                'Authorization': authorizationHeader
+            }
+        });
         if (!statusResponse.ok) {
             throw new Error(`Failed to fetch user status: ${statusResponse.statusText} (Status: ${statusResponse.status})`);
         }
@@ -137,10 +152,14 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
             throw new Error('API Base URL not configured');
         }
 
+        const idToken = getAuthToken();
+        const authorizationHeader = `Bearer ${idToken}`;
+
         const response = await fetch(`${apiBaseUrl}/api/users/${userId}/agreement`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': authorizationHeader
             },
             body: JSON.stringify({ agreed: true })
         });
