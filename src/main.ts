@@ -44,7 +44,7 @@ const initLiff = async (): Promise<void> => {
         const liffId = config.liffId;
 
         if (!liffId) {
-            throw new Error('VITE_CHANNEL_ID is not defined in .env');
+            throw new Error('LIFF ID is not configured (VITE_CHANNEL_ID or VITE_LIFF_ID must be set)');
         }
 
         await liff.init({ liffId });

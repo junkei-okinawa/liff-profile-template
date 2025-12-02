@@ -1,7 +1,6 @@
 export const getEnv = (key: string): string => {
   // ランタイム環境変数 (window._env_) を優先し、なければビルド時環境変数 (import.meta.env) を使用
-  // @ts-ignore
-  return window._env_?.[key] || import.meta.env[key] || '';
+  return window._env_?.[key] || (import.meta.env as Record<string, string>)[key] || '';
 };
 
 export const config = {

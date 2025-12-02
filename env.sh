@@ -7,7 +7,9 @@ touch /usr/share/nginx/html/env-config.js
 # Add assignment
 echo "window._env_ = {" >> /usr/share/nginx/html/env-config.js
 
-# Read each line in .env file
+first=true
+
+# Read environment variables matching VITE_ prefix
 # Each line represents key=value pairs
 printenv | grep VITE_ | while read -r line; do
   # Split env variables by character `=`
@@ -17,10 +19,15 @@ printenv | grep VITE_ | while read -r line; do
   fi
 
   # Read value of current variable if exists as Environment variable
-  value=$(printf '%s\n' "${varvalue}" | sed -e 's/\\/\\\\/g' -e 's/\"/\\"/g' -e 's/\n/\\n/g')
+  value=$(printf '%s\n' "${varvalue}" | sed -e 's/\\/\\\\/g' -e 's/\"/\\"/g' -e "s/'/\\'/g" -e 's/\n/\\n/g')
   
   # Append configuration property to JS file
-  echo "  $varname: \"$value\"," >> /usr/share/nginx/html/env-config.js
+  if [ "$first" = true ]; then
+    first=false
+  else
+    echo "," >> /usr/share/nginx/html/env-config.js
+  fi
+  printf "  %s: \"%s\"" "$varname" "$value" >> /usr/share/nginx/html/env-config.js
 done
 
 echo "};" >> /usr/share/nginx/html/env-config.js

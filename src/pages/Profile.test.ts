@@ -45,10 +45,17 @@ describe('Profile Page', () => {
       value: { reload: vi.fn() },
       writable: true
     });
+
+    // Setup window._env_ for runtime config
+    (window as any)._env_ = {
+        VITE_API_BASE_URL: 'http://localhost:8080'
+    };
   });
 
   afterEach(() => {
     document.body.removeChild(container);
+    // delete (window as any)._env_;
+    (window as any)._env_ = undefined;
   });
 
   it('renders profile with full information', async () => {
