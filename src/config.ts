@@ -4,7 +4,7 @@ export const getEnv = (key: string): string => {
 };
 
 export const config = {
-  apiBaseUrl: getEnv('VITE_API_BASE_URL'),
-  liffId: getEnv('VITE_CHANNEL_ID') || getEnv('VITE_LIFF_ID'),
-  callbackUrl: getEnv('VITE_CALLBACK_URL'),
+  get apiBaseUrl() { return getEnv('VITE_API_BASE_URL'); },
+  get liffId() { return getEnv('VITE_CHANNEL_ID') || getEnv('VITE_LIFF_ID'); },
+  get callbackUrl() { return getEnv('VITE_CALLBACK_URL'); },
 };
