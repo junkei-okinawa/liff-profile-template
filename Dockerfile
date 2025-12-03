@@ -19,4 +19,4 @@ RUN chmod +x /docker-entrypoint.d/env.sh
 
 EXPOSE 8080
 
-CMD ["/bin/sh", "-c", "/docker-entrypoint.d/env.sh && nginx -g 'daemon off;'"]
+CMD ["nginx", "-g", "daemon off;"]

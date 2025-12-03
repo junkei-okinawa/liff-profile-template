@@ -54,7 +54,6 @@ describe('Profile Page', () => {
 
   afterEach(() => {
     document.body.removeChild(container);
-    // delete (window as any)._env_;
     (window as any)._env_ = undefined;
   });
 

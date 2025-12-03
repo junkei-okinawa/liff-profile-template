@@ -43,7 +43,6 @@ describe('Terms Page', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     
     // Setup environment variables
-    // vi.stubEnv('VITE_API_BASE_URL', mockApiBaseUrl);
     (window as any)._env_ = {
         VITE_API_BASE_URL: mockApiBaseUrl
     };
@@ -60,8 +59,6 @@ describe('Terms Page', () => {
 
   afterEach(() => {
     document.body.removeChild(container);
-    vi.unstubAllEnvs();
-    // delete (window as any)._env_;
     (window as any)._env_ = undefined;
   });
 

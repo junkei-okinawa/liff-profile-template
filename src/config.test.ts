@@ -5,13 +5,11 @@ describe('Config Module', () => {
   beforeEach(() => {
     vi.resetModules();
     // Reset window._env_
-    // delete (window as any)._env_;
     (window as any)._env_ = undefined;
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    // delete (window as any)._env_;
     (window as any)._env_ = undefined;
   });
 
@@ -36,7 +34,6 @@ describe('Config Module', () => {
     });
 
     it('should handle undefined window._env_', () => {
-      // delete (window as any)._env_;
       (window as any)._env_ = undefined;
       vi.stubEnv('TEST_VAR', 'build-time-value');
 
