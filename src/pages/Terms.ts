@@ -1,6 +1,7 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import liff from '@line/liff';
+import { config } from '../config';
 
 export const renderTerms = async (container: HTMLElement): Promise<void> => {
     container.innerHTML = '<div class="loading">規約を読み込み中...</div>';
@@ -85,7 +86,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         }
 
         // Fetch user agreement status from Backend API
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+        const apiBaseUrl = config.apiBaseUrl;
         if (!apiBaseUrl) {
             throw new Error('API base URL is not configured');
         }
@@ -147,7 +148,7 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
     btn.textContent = '処理中...';
 
     try {
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+        const apiBaseUrl = config.apiBaseUrl;
         if (!apiBaseUrl) {
             throw new Error('API Base URL not configured');
         }

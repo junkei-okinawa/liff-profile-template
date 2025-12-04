@@ -4,6 +4,12 @@ import { vi } from 'vitest';
 // Mock window.alert
 window.alert = vi.fn();
 
+// Mock window._env_ for runtime config
+Object.defineProperty(window, '_env_', {
+  value: {},
+  writable: true
+});
+
 // Optional: Mock console.error to suppress expected error logs during tests
 // Uncomment if you want to silence all error logs
 // const originalConsoleError = console.error;

@@ -2,6 +2,7 @@ import liff from '@line/liff';
 import { renderProfile } from './pages/Profile';
 import { renderTerms } from './pages/Terms';
 import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer } from './pages/Unsubscribe';
+import { config } from './config';
 import './style.css';
 
 const app = document.getElementById('app') as HTMLElement;
@@ -40,17 +41,17 @@ const router = async (): Promise<void> => {
 // Initialize LIFF
 const initLiff = async (): Promise<void> => {
     try {
-        const liffId = import.meta.env.VITE_CHANNEL_ID;
+        const liffId = config.liffId;
 
         if (!liffId) {
-            throw new Error('VITE_CHANNEL_ID is not defined in .env');
+            throw new Error('LIFF ID is not configured (VITE_CHANNEL_ID or VITE_LIFF_ID must be set)');
         }
 
         await liff.init({ liffId });
 
         // Check if user is logged in and has context
         if (!liff.isLoggedIn()) {
-            liff.login({ redirectUri: import.meta.env.VITE_CALLBACK_URL || window.location.href });
+            liff.login({ redirectUri: config.callbackUrl || window.location.href });
             return;
         }
 
@@ -66,7 +67,7 @@ const initLiff = async (): Promise<void> => {
             } catch (e) {
                 // If getProfile also fails, show error or force login as last resort.
                 console.warn('No context/userId and getProfile failed, redirecting to login...', e);
-                liff.login({ redirectUri: import.meta.env.VITE_CALLBACK_URL || window.location.href });
+                liff.login({ redirectUri: config.callbackUrl || window.location.href });
                 return;
             }
         }
