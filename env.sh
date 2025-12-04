@@ -8,7 +8,12 @@ rm -f /usr/share/nginx/html/env-config.js
   echo "window._env_ = {"
   
   # Store env vars in a temp file to avoid subshell issues with while loop
-  printenv | grep VITE_ > /tmp/vite_env_vars || true
+  # Only include env vars whose names start with VITE_
+  printenv | grep -E '^VITE_' > /tmp/vite_env_vars || true
+  
+  # If no VITE_ environment variables exist, /tmp/vite_env_vars will be empty,
+  # and the resulting env-config.js will contain an empty object (window._env_ = {};).
+  # This is intentional and ensures valid JS output in all cases.
   
   first=true
   while read -r line; do
