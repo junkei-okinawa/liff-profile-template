@@ -47,6 +47,30 @@ const initLiff = async (): Promise<void> => {
             throw new Error('LIFF ID is not configured (VITE_CHANNEL_ID or VITE_LIFF_ID must be set)');
         }
 
+        if (liffId === 'test-liff-id') {
+            console.log('Test Mode: Mocking LIFF');
+            Object.assign(liff, {
+                init: () => Promise.resolve(),
+                isLoggedIn: () => true,
+                getProfile: () => Promise.resolve({
+                    userId: 'U00000000000000000000000000000000',
+                    displayName: 'Test User',
+                    pictureUrl: 'https://example.com/avatar.png',
+                    statusMessage: 'Ready for test'
+                }),
+                getIDToken: () => 'mock-user-U00000000000000000000000000000000',
+                getContext: () => ({
+                    type: 'utou',
+                    userId: 'U00000000000000000000000000000000',
+                    viewType: 'full',
+                    accessToken: 'mock-access-token'
+                }),
+                getOS: () => 'web',
+                getAppLanguage: () => 'ja',
+                login: () => { },
+            });
+        }
+
         await liff.init({ liffId });
 
         // Check if user is logged in and has context
