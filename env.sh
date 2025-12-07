@@ -23,7 +23,7 @@ rm -f /usr/share/nginx/html/env-config.js
       varvalue=$(printf '%s\n' "$line" | sed -e 's/^[^=]*=//')
       
       # Escape special characters
-      value=$(printf '%s\n' "${varvalue}" | sed -e 's/\\/\\\\/g' -e 's/\"/\\"/g' -e "s/'/\\'/g" -e 's/\n/\\n/g')
+      value=$(printf '%s' "${varvalue}" | tr '\n' '\\n' | sed -e 's/\\/\\\\/g' -e 's/\"/\\"/g' -e "s/'/\\'/g")
       
       # Append comma if not first
       if [ "$first" = true ]; then

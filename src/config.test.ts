@@ -5,12 +5,12 @@ describe('Config Module', () => {
   beforeEach(() => {
     vi.resetModules();
     // Reset window._env_
-    (window as any)._env_ = undefined;
+    (window as any)._env_ = {};
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    (window as any)._env_ = undefined;
+    (window as any)._env_ = {};
   });
 
   describe('getEnv', () => {
@@ -57,6 +57,7 @@ describe('Config Module', () => {
         VITE_LIFF_ID: 'fallback-liff-id'
       };
 
+      vi.stubEnv('VITE_CHANNEL_ID', '');
       expect(config.liffId).toBe('fallback-liff-id');
     });
   });
