@@ -1,5 +1,11 @@
 /// <reference types="vite/client" />
 
+interface Window {
+  _env_: {
+    [key: string]: string;
+  };
+}
+
 interface ImportMetaEnv {
     readonly VITE_CHANNEL_ID: string
     readonly VITE_CHANNEL_SECRET: string

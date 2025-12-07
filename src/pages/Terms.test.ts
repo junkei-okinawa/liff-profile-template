@@ -35,16 +35,18 @@ describe('Terms Page', () => {
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
-    
+
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Suppress console.error for expected errors
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+    vi.spyOn(console, 'error').mockImplementation(() => { });
+
     // Setup environment variables
-    vi.stubEnv('VITE_API_BASE_URL', mockApiBaseUrl);
-    
+    (window as any)._env_ = {
+      VITE_API_BASE_URL: mockApiBaseUrl
+    };
+
     // Setup global fetch
     global.fetch = vi.fn();
 
@@ -57,7 +59,7 @@ describe('Terms Page', () => {
 
   afterEach(() => {
     document.body.removeChild(container);
-    vi.unstubAllEnvs();
+    (window as any)._env_ = {};
   });
 
   it('renders terms content and checks agreement status (not agreed)', async () => {

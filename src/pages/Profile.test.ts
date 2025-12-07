@@ -26,29 +26,35 @@ describe('Profile Page', () => {
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
-    
+
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Suppress console.error for expected errors
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+    vi.spyOn(console, 'error').mockImplementation(() => { });
+
     // Default LIFF mock setup
     (liff.isInClient as any).mockReturnValue(true);
     (liff.isLoggedIn as any).mockReturnValue(true);
     (liff.getProfile as any).mockResolvedValue(mockProfile);
     (liff.getAppLanguage as any).mockReturnValue('ja');
     (liff.getOS as any).mockReturnValue('web');
-    
+
     // Mock window methods
     Object.defineProperty(window, 'location', {
       value: { reload: vi.fn() },
       writable: true
     });
+
+    // Setup window._env_ for runtime config
+    (window as any)._env_ = {
+      VITE_API_BASE_URL: 'http://localhost:8080'
+    };
   });
 
   afterEach(() => {
     document.body.removeChild(container);
+    (window as any)._env_ = {};
   });
 
   it('renders profile with full information', async () => {
@@ -58,12 +64,12 @@ describe('Profile Page', () => {
     expect(container.innerHTML).toContain('Test User');
     expect(container.innerHTML).toContain('Hello World');
     expect(container.innerHTML).toContain('U1234567890');
-    
+
     // Check image
     const img = container.querySelector('img');
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('src', 'https://example.com/avatar.png');
-    
+
     // Check system info
     expect(container.innerHTML).toContain('ja');
     expect(container.innerHTML).toContain('web');
@@ -79,7 +85,7 @@ describe('Profile Page', () => {
 
     expect(container.innerHTML).toContain('No Image User');
     expect(container.innerHTML).toContain('U999');
-    
+
     // Check fallback image
     const img = container.querySelector('img');
     expect(img).not.toBeInTheDocument();
