@@ -68,6 +68,7 @@ const initLiff = async (): Promise<void> => {
                 getOS: () => 'web',
                 getAppLanguage: () => 'ja',
                 login: () => { },
+                closeWindow: () => { },
             });
         }
 
