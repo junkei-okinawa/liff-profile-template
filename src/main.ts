@@ -74,9 +74,9 @@ const initLiff = async (): Promise<void> => {
                 login: () => { },
                 closeWindow: () => { },
             });
+        } else {
+            await liff.init({ liffId });
         }
-
-        await liff.init({ liffId });
 
         // Check if user is logged in and has context
         if (!liff.isLoggedIn()) {
