@@ -23,6 +23,7 @@ test.beforeEach(async ({ page }) => {
             getOS: () => 'web',
             getAppLanguage: () => 'ja',
             closeWindow: () => { },
+            login: () => { },
         };
 
         // Inject runtime config
