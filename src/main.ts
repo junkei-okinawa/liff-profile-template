@@ -73,6 +73,7 @@ const initLiff = async (): Promise<void> => {
                 getAppLanguage: () => 'ja',
                 login: () => { },
                 closeWindow: () => { },
+                logout: () => { },
             });
         } else {
             await liff.init({ liffId });
