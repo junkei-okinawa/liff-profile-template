@@ -48,10 +48,10 @@ const initLiff = async (): Promise<void> => {
         }
 
         if (liffId === 'test-liff-id') {
-            console.log('Test Mode: Mocking LIFF');
             Object.assign(liff, {
                 init: () => Promise.resolve(),
                 isLoggedIn: () => true,
+                isInClient: () => true,
                 getProfile: () => Promise.resolve({
                     userId: 'U00000000000000000000000000000000',
                     displayName: 'Test User',
