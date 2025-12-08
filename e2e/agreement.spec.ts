@@ -1,32 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-    // Mock window.liff before page loads
+    // Inject runtime config
     await page.addInitScript(() => {
-        (window as any).liff = {
-            init: () => Promise.resolve(),
-            isInClient: () => true,
-            isLoggedIn: () => true,
-            getProfile: () => Promise.resolve({
-                userId: 'U00000000000000000000000000000000',
-                displayName: 'Test User',
-                pictureUrl: 'https://example.com/avatar.png',
-                statusMessage: 'Ready for test'
-            }),
-            getIDToken: () => 'mock-user-U00000000000000000000000000000000', // Matches backend mock auth pattern
-            getContext: () => ({
-                type: 'utou',
-                userId: 'U00000000000000000000000000000000',
-                viewType: 'full',
-                accessToken: 'mock-access-token'
-            }),
-            getOS: () => 'web',
-            getAppLanguage: () => 'ja',
-            closeWindow: () => { },
-            login: () => { },
-        };
-
-        // Inject runtime config
         (window as any)._env_ = {
             VITE_API_BASE_URL: 'http://localhost:8080',
             VITE_LIFF_ID: 'test-liff-id',
