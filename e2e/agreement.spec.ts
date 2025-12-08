@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 
 test('should allow user to agree to terms and persist agreement state', async ({ page }) => {
     // 1. Go to Profile page and verify authentication
-    // Let's start at Profile page to verify auth
+
     await page.goto('/');
 
     // Verify Profile Loaded
