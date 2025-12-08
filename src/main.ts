@@ -47,6 +47,9 @@ const initLiff = async (): Promise<void> => {
             throw new Error('LIFF ID is not configured (VITE_CHANNEL_ID or VITE_LIFF_ID must be set)');
         }
 
+        // Mock the LIFF SDK when running in test mode.
+        // This block is used for E2E testing with Playwright and enables local testing
+        // without a real LINE environment by providing a mock implementation of the LIFF API.
         if (liffId === 'test-liff-id') {
             Object.assign(liff, {
                 init: () => Promise.resolve(),
