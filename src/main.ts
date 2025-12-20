@@ -90,17 +90,13 @@ const initLiff = async (): Promise<void> => {
         }
 
         const context = liff.getContext();
+        // If context/userId is missing (e.g. external browser), try getProfile as fallback
         if (!context || !context.userId) {
-            // If getContext is null (likely in external browser), try to get profile as fallback.
             try {
                 const profile = await liff.getProfile();
-                // If getProfile succeeds, we have a valid user session.
-                // Note: We don't store the profile here, just verifying we can get it.
-                // The pages will fetch what they need.
                 console.log('Context not found but profile retrieved:', profile.userId);
             } catch (e) {
-                // If getProfile also fails, show error or force login as last resort.
-                console.warn('No context/userId and getProfile failed, redirecting to login...', e);
+                console.warn('No session found, redirecting to login...', e);
                 liff.login({ redirectUri: config.callbackUrl || window.location.href });
                 return;
             }
