@@ -58,12 +58,11 @@ const initLiff = async (): Promise<void> => {
             // In a production build where VITE_ENABLE_MOCK_LIFF is false/undefined,
             // static analysis tools (tree-shaking) can effectively eliminate this code path.
             setupMockLiff();
-            // Even in mock mode, we must call init() to satisfy the promise chain
+            // Even in mock mode, we must call init() to satisfy the promise chain,
             // although the mock implementation of init() resolves immediately.
-            await liff.init({ liffId });
-        } else {
-            await liff.init({ liffId });
         }
+
+        await liff.init({ liffId });
 
         // Check if user is logged in and has context
         if (!liff.isLoggedIn()) {

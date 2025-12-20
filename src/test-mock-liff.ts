@@ -1,31 +1,43 @@
 import liff from '@line/liff';
 
+interface MockLiffState {
+    isLoggedIn: boolean;
+}
+
+// Use WeakMap to store mock state separately from the liff object
+const mockStateMap = new WeakMap<typeof liff, MockLiffState>();
+
 // Reset the mock state to initial values
 export const resetMockLiff = () => {
-    if ((liff as any)._mockState) {
-        (liff as any)._mockState = {
-            isLoggedIn: true,
-            calls: [],
-        };
-        console.log('[Mock LIFF] State reset');
+    const state = mockStateMap.get(liff);
+    if (state) {
+        state.isLoggedIn = true;
     }
 };
 
 export const setupMockLiff = () => {
     // Ensure clean state on setup
-    if ((liff as any)._mockState) {
+    if (mockStateMap.has(liff)) {
         resetMockLiff();
         return;
     }
 
+    // Initialize mock state
+    mockStateMap.set(liff, {
+        isLoggedIn: true,
+    });
+
     Object.assign(liff, {
-        _mockState: {
-            isLoggedIn: true,
-            calls: [] as string[],
+        init: function (config?: { liffId?: string }) {
+            const liffId = config && (config as any).liffId;
+            if (typeof liffId !== 'string' || liffId.trim() === '') {
+                return Promise.reject(new Error('[Mock LIFF] Invalid liffId passed to init'));
+            }
+            return Promise.resolve();
         },
-        init: () => Promise.resolve(),
         isLoggedIn: function () {
-            return (this as any)._mockState.isLoggedIn;
+            const state = mockStateMap.get(liff);
+            return state ? state.isLoggedIn : false;
         },
         isInClient: () => true,
         getLanguage: () => 'ja',
@@ -48,18 +60,31 @@ export const setupMockLiff = () => {
             endpoint: 'https://example.com'
         }),
         login: function () {
-            (this as any)._mockState.calls.push('login');
-            (this as any)._mockState.isLoggedIn = true;
-            console.log('[Mock LIFF] login called');
+            const state = mockStateMap.get(liff);
+            if (state) {
+                state.isLoggedIn = true;
+            }
         },
         closeWindow: function () {
-            (this as any)._mockState.calls.push('closeWindow');
-            console.log('[Mock LIFF] closeWindow called');
+            // Mock implementation - no-op for testing
         },
         logout: function () {
-            (this as any)._mockState.calls.push('logout');
-            (this as any)._mockState.isLoggedIn = false;
-            console.log('[Mock LIFF] logout called');
+            const state = mockStateMap.get(liff);
+            if (state) {
+                state.isLoggedIn = false;
+            }
+        },
+        sendMessages: function () {
+            return Promise.resolve();
+        },
+        openWindow: function () {
+            // Mock implementation - no-op for testing
+        },
+        shareTargetPicker: function () {
+            return Promise.resolve();
+        },
+        getFriendship: function () {
+            return Promise.resolve({ friendFlag: true });
         },
     });
 };

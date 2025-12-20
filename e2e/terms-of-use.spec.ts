@@ -19,7 +19,13 @@ test('should allow user to agree to terms and persist agreement state', async ({
     // 1. Go to Profile page and verify authentication
 
     const response = await page.goto('/');
-    expect(response?.status()).toBe(200);
+
+    // Verify successful navigation
+    if (!response) {
+        throw new Error('Failed to navigate to page');
+    }
+    expect(response.status()).toBe(200);
+    expect(response.ok()).toBe(true);
 
     // Verify app root is visible
     await expect(page.locator('#app')).toBeVisible();
