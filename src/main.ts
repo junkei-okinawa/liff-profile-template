@@ -71,9 +71,9 @@ const initLiff = async (): Promise<void> => {
                 }),
                 getOS: () => 'web',
                 getAppLanguage: () => 'ja',
-                login: () => { },
-                closeWindow: () => { },
-                logout: () => { },
+                login: () => { console.log('[Mock LIFF] login called'); },
+                closeWindow: () => { console.log('[Mock LIFF] closeWindow called'); },
+                logout: () => { console.log('[Mock LIFF] logout called'); },
             });
         } else {
             await liff.init({ liffId });
