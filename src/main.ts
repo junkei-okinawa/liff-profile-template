@@ -3,7 +3,7 @@ import { renderProfile } from './pages/Profile';
 import { renderTerms } from './pages/Terms';
 import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer } from './pages/Unsubscribe';
 import { config } from './config';
-import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './test-constants';
+import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './shared-constants';
 import { setupMockLiff } from './test-mock-liff';
 import './style.css';
 
@@ -54,7 +54,13 @@ const initLiff = async (): Promise<void> => {
         // SECURITY: Ensure this only runs in DEV mode and explicitly enabled.
         const enableMockLiff = import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true';
         if (enableMockLiff && [TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId) && import.meta.env.DEV) {
+            // NOTE: This block is strictly for development/testing customization.
+            // In a production build where VITE_ENABLE_MOCK_LIFF is false/undefined,
+            // static analysis tools (tree-shaking) can effectively eliminate this code path.
             setupMockLiff();
+            // Even in mock mode, we must call init() to satisfy the promise chain
+            // although the mock implementation of init() resolves immediately.
+            await liff.init({ liffId });
         } else {
             await liff.init({ liffId });
         }

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './src/test-constants';
+import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './src/shared-constants';
 
 export default defineConfig({
     testDir: './e2e',
@@ -9,10 +9,10 @@ export default defineConfig({
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : undefined,
     reporter: 'html',
-    timeout: 30000,
+    timeout: 15000,
     use: {
         baseURL: 'http://localhost:3000',
-        actionTimeout: 30000,
+        actionTimeout: 15000,
         trace: 'on-first-retry',
     },
     projects: [

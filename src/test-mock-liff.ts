@@ -1,6 +1,23 @@
 import liff from '@line/liff';
 
+// Reset the mock state to initial values
+export const resetMockLiff = () => {
+    if ((liff as any)._mockState) {
+        (liff as any)._mockState = {
+            isLoggedIn: true,
+            calls: [],
+        };
+        console.log('[Mock LIFF] State reset');
+    }
+};
+
 export const setupMockLiff = () => {
+    // Ensure clean state on setup
+    if ((liff as any)._mockState) {
+        resetMockLiff();
+        return;
+    }
+
     Object.assign(liff, {
         _mockState: {
             isLoggedIn: true,

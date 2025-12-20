@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TEST_LIFF_ID, TEST_CHANNEL_ID } from '../src/test-constants';
+import { TEST_LIFF_ID, TEST_CHANNEL_ID } from '../src/shared-constants';
 
 test.beforeEach(async ({ page }) => {
     // Inject runtime config
