@@ -3,6 +3,7 @@ import { renderProfile } from './pages/Profile';
 import { renderTerms } from './pages/Terms';
 import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer } from './pages/Unsubscribe';
 import { config } from './config';
+import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './test-constants';
 import './style.css';
 
 const app = document.getElementById('app') as HTMLElement;
@@ -37,8 +38,6 @@ const router = async (): Promise<void> => {
         }
     }
 };
-import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './test-constants';
-
 // Initialize LIFF
 const initLiff = async (): Promise<void> => {
     try {
@@ -55,8 +54,12 @@ const initLiff = async (): Promise<void> => {
         const enableMockLiff = import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true';
         if (enableMockLiff && [TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId) && import.meta.env.DEV) {
             Object.assign(liff, {
+                _mockState: {
+                    isLoggedIn: true,
+                    calls: [] as string[],
+                },
                 init: () => Promise.resolve(),
-                isLoggedIn: () => true,
+                isLoggedIn: function () { return (this as any)._mockState.isLoggedIn; },
                 isInClient: () => true,
                 getLanguage: () => 'ja',
                 getVersion: () => '2.21.0',
@@ -77,9 +80,20 @@ const initLiff = async (): Promise<void> => {
                     accessToken: 'mock-access-token',
                     endpoint: 'https://example.com'
                 }),
-                login: () => { console.log('[Mock LIFF] login called'); },
-                closeWindow: () => { console.log('[Mock LIFF] closeWindow called'); },
-                logout: () => { console.log('[Mock LIFF] logout called'); },
+                login: function () {
+                    (this as any)._mockState.calls.push('login');
+                    (this as any)._mockState.isLoggedIn = true;
+                    console.log('[Mock LIFF] login called');
+                },
+                closeWindow: function () {
+                    (this as any)._mockState.calls.push('closeWindow');
+                    console.log('[Mock LIFF] closeWindow called');
+                },
+                logout: function () {
+                    (this as any)._mockState.calls.push('logout');
+                    (this as any)._mockState.isLoggedIn = false;
+                    console.log('[Mock LIFF] logout called');
+                },
             });
         } else {
             await liff.init({ liffId });
@@ -92,7 +106,7 @@ const initLiff = async (): Promise<void> => {
         }
 
         const context = liff.getContext();
-        // If context/userId is missing (e.g. external browser), try getProfile as fallback
+        // If context/userId is missing (e.g. app opened in an external browser outside the LINE app environment), try getProfile as fallback
         if (!context || !context.userId) {
             try {
                 const profile = await liff.getProfile();
@@ -109,7 +123,7 @@ const initLiff = async (): Promise<void> => {
 
     } catch (error) {
         console.error('LIFF Init failed', error);
-        app.innerHTML = `<div class="container"><p style="color:red">LIFFの初期化中にエラーが発生しました。しばらくしてから再度お試しください。</p></div>`;
+        app.innerHTML = `< div class="container" > <p style="color:red" > LIFFの初期化中にエラーが発生しました。しばらくしてから再度お試しください。</p></div > `;
     }
 };
 

@@ -18,7 +18,11 @@ test.beforeEach(async ({ page }) => {
 test('should allow user to agree to terms and persist agreement state', async ({ page }) => {
     // 1. Go to Profile page and verify authentication
 
-    await page.goto('/');
+    const response = await page.goto('/');
+    expect(response?.status()).toBe(200);
+
+    // Verify app root is visible
+    await expect(page.locator('#app')).toBeVisible();
 
     // Verify Profile Loaded
     await expect(page.getByText('Test User')).toBeVisible();
