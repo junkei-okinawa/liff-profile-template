@@ -9,7 +9,7 @@ export default defineConfig({
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : undefined,
     reporter: 'html',
-    timeout: 60000,
+    timeout: 30000,
     use: {
         baseURL: 'http://localhost:3000',
         actionTimeout: 30000,
@@ -27,8 +27,9 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
         env: {
             ...process.env,
-            VITE_LIFF_ID: process.env.VITE_LIFF_ID ?? TEST_LIFF_ID,
-            VITE_CHANNEL_ID: process.env.VITE_CHANNEL_ID ?? TEST_CHANNEL_ID,
+            VITE_LIFF_ID: process.env.VITE_LIFF_ID || TEST_LIFF_ID,
+            VITE_CHANNEL_ID: process.env.VITE_CHANNEL_ID || TEST_CHANNEL_ID,
+            VITE_ENABLE_MOCK_LIFF: 'true',
         },
     },
 });
