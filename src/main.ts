@@ -56,6 +56,10 @@ const initLiff = async (): Promise<void> => {
                 init: () => Promise.resolve(),
                 isLoggedIn: () => true,
                 isInClient: () => true,
+                getLanguage: () => 'ja',
+                getVersion: () => '2.21.0',
+                getAppLanguage: () => 'ja',
+                getOS: () => 'web',
                 getProfile: () => Promise.resolve({
                     userId: 'U00000000000000000000000000000000',
                     displayName: 'Test User',
@@ -63,14 +67,14 @@ const initLiff = async (): Promise<void> => {
                     statusMessage: 'Ready for test'
                 }),
                 getIDToken: () => 'mock-user-U00000000000000000000000000000000',
+                getAccessToken: () => 'mock-access-token',
                 getContext: () => ({
                     type: 'utou',
                     userId: 'U00000000000000000000000000000000',
                     viewType: 'full',
-                    accessToken: 'mock-access-token'
+                    accessToken: 'mock-access-token',
+                    endpoint: 'https://example.com'
                 }),
-                getOS: () => 'web',
-                getAppLanguage: () => 'ja',
                 login: () => { console.log('[Mock LIFF] login called'); },
                 closeWindow: () => { console.log('[Mock LIFF] closeWindow called'); },
                 logout: () => { console.log('[Mock LIFF] logout called'); },
