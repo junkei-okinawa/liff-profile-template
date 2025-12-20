@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { TEST_LIFF_ID, TEST_CHANNEL_ID } from '../src/test-constants';
 
 test.beforeEach(async ({ page }) => {
     // Inject runtime config
-    await page.addInitScript(() => {
+    await page.addInitScript(({ TEST_LIFF_ID, TEST_CHANNEL_ID }) => {
         (window as any)._env_ = {
             VITE_API_BASE_URL: 'http://localhost:8080',
-            VITE_LIFF_ID: 'test-liff-id',
-            VITE_CHANNEL_ID: 'test-liff-id'
+            VITE_LIFF_ID: TEST_LIFF_ID,
+            VITE_CHANNEL_ID: TEST_CHANNEL_ID
         };
-    });
+    }, { TEST_LIFF_ID, TEST_CHANNEL_ID });
 
     // Block env-config.js to prevent overwriting window._env_
     await page.route('**/env-config.js', route => route.abort());

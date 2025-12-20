@@ -37,6 +37,7 @@ const router = async (): Promise<void> => {
         }
     }
 };
+import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './test-constants';
 
 // Initialize LIFF
 const initLiff = async (): Promise<void> => {
@@ -51,7 +52,7 @@ const initLiff = async (): Promise<void> => {
         // This block is used for E2E testing with Playwright and enables local testing
         // without a real LINE environment by providing a mock implementation of the LIFF API.
         // SECURITY: Ensure this only runs in DEV mode.
-        if (liffId === 'test-liff-id' && import.meta.env.DEV) {
+        if ([TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId) && import.meta.env.DEV) {
             Object.assign(liff, {
                 init: () => Promise.resolve(),
                 isLoggedIn: () => true,

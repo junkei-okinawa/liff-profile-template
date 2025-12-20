@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './src/test-constants';
+
 export default defineConfig({
     testDir: './e2e',
     fullyParallel: true,
@@ -25,7 +27,8 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
         env: {
             ...process.env,
-            VITE_LIFF_ID: process.env.VITE_LIFF_ID ?? 'test-liff-id',
+            VITE_LIFF_ID: process.env.VITE_LIFF_ID ?? TEST_LIFF_ID,
+            VITE_CHANNEL_ID: process.env.VITE_CHANNEL_ID ?? TEST_CHANNEL_ID,
         },
     },
 });
