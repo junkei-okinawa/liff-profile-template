@@ -21,5 +21,6 @@ if (typeof window !== 'undefined') {
 
 // No-op, as setup is handled by alias replacement when VITE_ENABLE_MOCK_LIFF is true
 export const setupMockLiff = (liffInstance: any = liff) => {
-    resetMockLiff(liffInstance);
+    // Do nothing. Initialization is handled by the mock module itself.
+    // Calling resetMockLiff() here would reset isLoggedIn to false, which breaks E2E tests expecting logged-in state.
 };
