@@ -1,7 +1,7 @@
 // Mock implementation of @line/liff
 // This file is used via Vite alias replacement when VITE_ENABLE_MOCK_LIFF is true.
 
-let isLoggedIn = false;
+let isLoggedIn = true;
 
 const mockLiff = {
     id: 'mock-liff-id',
