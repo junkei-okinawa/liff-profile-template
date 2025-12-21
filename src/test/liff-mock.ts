@@ -1,6 +1,7 @@
 // Mock implementation of @line/liff
 // This file is used via Vite alias replacement when VITE_ENABLE_MOCK_LIFF is true.
 import type { LiffConfig } from '@line/liff';
+import { TEST_USER_ID } from '../shared-constants';
 
 let isLoggedIn = true;
 
@@ -10,7 +11,7 @@ const mockLiff = {
         console.log('[Mock LIFF] init called', config);
         const liffId = config?.liffId;
         if (typeof liffId !== 'string' || liffId.trim() === '') {
-            return Promise.reject(new Error('[Mock LIFF] Invalid liffId passed to init'));
+            return Promise.reject(new Error('[Mock LIFF] liffId must be a non-empty string'));
         }
         return Promise.resolve();
     },
@@ -20,8 +21,8 @@ const mockLiff = {
     getAppLanguage: () => 'ja',
     isInClient: () => true,
     isLoggedIn: () => isLoggedIn,
-    login: () => {
-        console.log('[Mock LIFF] login called');
+    login: (config?: { redirectUri?: string }) => {
+        console.log('[Mock LIFF] login called', config);
         isLoggedIn = true;
     },
     logout: () => {
@@ -29,16 +30,16 @@ const mockLiff = {
         isLoggedIn = false;
     },
     getProfile: () => Promise.resolve({
-        userId: 'U00000000000000000000000000000000',
+        userId: TEST_USER_ID,
         displayName: 'Test User',
         pictureUrl: 'https://example.com/avatar.png',
         statusMessage: 'Ready for test'
     }),
-    getIDToken: () => 'mock-user-U00000000000000000000000000000000',
+    getIDToken: () => `mock-user-${TEST_USER_ID}`,
     getAccessToken: () => 'mock-access-token',
     getContext: () => ({
         type: 'utou',
-        userId: 'U00000000000000000000000000000000',
+        userId: TEST_USER_ID,
         viewType: 'full',
         accessToken: 'mock-access-token',
         endpoint: 'https://example.com'

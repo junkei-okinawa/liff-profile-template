@@ -9,3 +9,8 @@ export const TEST_LIFF_ID = 'test-liff-id';
  * This value should match the VITE_CHANNEL_ID set in playwright.config.ts.
  */
 export const TEST_CHANNEL_ID = 'test-channel-id';
+
+/**
+ * Default Mock User ID for testing.
+ */
+export const TEST_USER_ID = 'U00000000000000000000000000000000';

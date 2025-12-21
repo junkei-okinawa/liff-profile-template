@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TEST_LIFF_ID, TEST_CHANNEL_ID } from '../src/shared-constants';
+import { TEST_LIFF_ID, TEST_CHANNEL_ID, TEST_USER_ID } from '../src/shared-constants';
 
 test.beforeEach(async ({ page }) => {
     // Debug console output
@@ -18,10 +18,10 @@ test.beforeEach(async ({ page }) => {
     await page.route('**/env-config.js', route => route.abort());
 });
 
-test('should allow user to agree to terms and persist agreement state', async ({ page }) => {
+test('should allow user to agree to terms and maintain state on reload', async ({ page }) => {
     // Mock API State
     let isAgreed = false;
-    const mockUserId = 'U00000000000000000000000000000000';
+    const mockUserId = TEST_USER_ID;
 
     // Mock GET /api/users/{userId}/status
     await page.route(`**/api/users/${mockUserId}/status`, async route => {
@@ -74,7 +74,7 @@ test('should allow user to agree to terms and persist agreement state', async ({
 
     // Verify Profile Loaded
     await expect(page.getByText('Test User')).toBeVisible();
-    await expect(page.getByText('U00000000000000000000000000000000')).toBeVisible();
+    await expect(page.getByText(TEST_USER_ID)).toBeVisible();
 
     // 2. Navigate to Terms
     await page.getByRole('link', { name: '利用規約' }).click();

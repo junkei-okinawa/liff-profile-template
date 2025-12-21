@@ -15,7 +15,15 @@ if (typeof window !== 'undefined' && import.meta.env.VITE_ENABLE_MOCK_LIFF === '
     (window as any).resetMockLiff = resetMockLiff;
 }
 
-// No-op, as setup is handled by alias replacement when VITE_ENABLE_MOCK_LIFF is true
+// Ensure mock LIFF is in a clean initial state and expose helpers when mock mode is enabled
 export const setupMockLiff = () => {
-    // Do nothing. Initialization is handled by the mock module itself via Vite alias.
+    if (import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true' || import.meta.env.MODE === 'test') {
+        // Reset mock state so each invocation starts from a known baseline
+        resetMockLiff();
+
+        // Re-expose resetMockLiff on window (idempotent) for E2E tests
+        if (typeof window !== 'undefined') {
+            (window as any).resetMockLiff = resetMockLiff;
+        }
+    }
 };
