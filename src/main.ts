@@ -56,10 +56,15 @@ const initLiff = async (): Promise<void> => {
         // While import.meta.env.DEV prevents execution during development, setting the env var
         // in a production build pipeline could potentially expose the mock if DEV check fails or is overridden.
         const enableMockLiff = import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true';
+        console.log('DEBUG: Checking Mock LIFF condition:', {
+            enableMockLiff,
+            liffId,
+            isTestId: [TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId),
+            isDev: import.meta.env.DEV
+        });
+
         if (enableMockLiff && [TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId) && import.meta.env.DEV) {
-            // NOTE: This block is strictly for development/testing customization.
-            // In a production build where VITE_ENABLE_MOCK_LIFF is false/undefined,
-            // static analysis tools (tree-shaking) can effectively eliminate this code path.
+            console.log('DEBUG: Setting up Mock LIFF');
             setupMockLiff();
             // Even in mock mode, we must call init() to satisfy the promise chain,
             // although the mock implementation of init() resolves immediately.

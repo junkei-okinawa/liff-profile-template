@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupMockLiff, resetMockLiff } from '../test-mock-liff';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import liff from '@line/liff';
+
+// Cast to any to access internal methods added by mock
+const mockLiff = liff as any;
 
 // Mock console.error to avoid noise
 const originalConsoleError = console.error;
@@ -11,45 +14,43 @@ afterEach(() => {
 });
 
 describe('Mock LIFF', () => {
-    let mockLiffObject: any;
-
     beforeEach(() => {
-        // Create a plain object to simulate liff
-        mockLiffObject = {};
         // Reset mock state
-        resetMockLiff(mockLiffObject);
-        setupMockLiff(mockLiffObject);
+        if (mockLiff._reset) {
+            mockLiff._reset();
+        }
     });
 
     it('should initialize with valid liffId', async () => {
-        expect(mockLiffObject.init).toBeDefined();
-        await expect(mockLiffObject.init({ liffId: 'valid-id' })).resolves.not.toThrow();
+        expect(liff.init).toBeDefined();
+        await expect(liff.init({ liffId: 'valid-id' })).resolves.not.toThrow();
     });
 
     it('should reject init with invalid liffId', async () => {
-        await expect(mockLiffObject.init({ liffId: '' })).rejects.toThrow('Invalid liffId');
+        await expect(liff.init({ liffId: '' })).rejects.toThrow('Invalid liffId');
         // @ts-ignore
-        await expect(mockLiffObject.init({})).rejects.toThrow('Invalid liffId');
+        await expect(liff.init({})).rejects.toThrow('Invalid liffId');
     });
 
     it('should handle login state', () => {
-        expect(mockLiffObject.isLoggedIn()).toBe(true); // Default mock state
+        // Initial state is false after reset
+        expect(liff.isLoggedIn()).toBe(false); 
         
-        mockLiffObject.logout();
-        expect(mockLiffObject.isLoggedIn()).toBe(false);
+        liff.login();
+        expect(liff.isLoggedIn()).toBe(true);
 
-        mockLiffObject.login();
-        expect(mockLiffObject.isLoggedIn()).toBe(true);
+        liff.logout();
+        expect(liff.isLoggedIn()).toBe(false);
     });
 
     it('should return mock profile', async () => {
-        const profile = await mockLiffObject.getProfile();
+        const profile = await liff.getProfile();
         expect(profile).toHaveProperty('userId');
         expect(profile.displayName).toBe('Test User');
     });
 
     it('should return mock context', () => {
-        const context = mockLiffObject.getContext();
+        const context = liff.getContext();
         expect(context).not.toBeNull();
         expect(context?.type).toBe('utou');
     });

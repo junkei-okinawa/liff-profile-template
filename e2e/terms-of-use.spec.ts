@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 import { TEST_LIFF_ID, TEST_CHANNEL_ID } from '../src/shared-constants';
 
 test.beforeEach(async ({ page }) => {
+    // Debug console output
+    page.on('console', msg => console.log(`BROWSER CONSOLE: ${msg.text()}`));
+
     // Inject runtime config
     await page.addInitScript(({ TEST_LIFF_ID, TEST_CHANNEL_ID }) => {
         (window as any)._env_ = {
