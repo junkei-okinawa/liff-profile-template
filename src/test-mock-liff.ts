@@ -5,14 +5,14 @@ interface MockLiffState {
 }
 
 // Use WeakMap to store mock state separately from the liff object
-const mockStateMap = new WeakMap<typeof liff, MockLiffState>();
+const mockStateMap = new WeakMap<any, MockLiffState>();
 
 // Reset the mock state to initial values
-export const resetMockLiff = () => {
-    let state = mockStateMap.get(liff);
+export const resetMockLiff = (liffInstance: any = liff) => {
+    let state = mockStateMap.get(liffInstance);
     if (!state) {
         state = { isLoggedIn: true };
-        mockStateMap.set(liff, state);
+        mockStateMap.set(liffInstance, state);
         return;
     }
     state.isLoggedIn = true;
@@ -23,28 +23,20 @@ if (typeof window !== 'undefined') {
     (window as any).resetMockLiff = resetMockLiff;
 }
 
-export const setupMockLiff = () => {
+export const setupMockLiff = (liffInstance: any = liff) => {
     // Ensure clean state on setup
-    if (mockStateMap.has(liff)) {
-        resetMockLiff();
-        return;
-    }
+    resetMockLiff(liffInstance);
 
-    // Initialize mock state
-    mockStateMap.set(liff, {
-        isLoggedIn: true,
-    });
-
-    Object.assign(liff, {
-        init: function (config?: { liffId: string }) {
+    const mockMethods: Record<string, any> = {
+        init: (config?: { liffId: string }) => {
             const liffId = config?.liffId;
             if (typeof liffId !== 'string' || liffId.trim() === '') {
                 return Promise.reject(new Error('[Mock LIFF] Invalid liffId passed to init'));
             }
             return Promise.resolve();
         },
-        isLoggedIn: function () {
-            const state = mockStateMap.get(liff);
+        isLoggedIn: () => {
+            const state = mockStateMap.get(liffInstance);
             return state ? state.isLoggedIn : false;
         },
         isInClient: () => true,
@@ -67,32 +59,27 @@ export const setupMockLiff = () => {
             accessToken: 'mock-access-token',
             endpoint: 'https://example.com'
         }),
-        login: function (loginConfig?: { redirectUri?: string }): void {
-            const state = mockStateMap.get(liff);
-            if (state) {
-                state.isLoggedIn = true;
-            }
+        login: (loginConfig?: { redirectUri?: string }) => {
+            const state = mockStateMap.get(liffInstance);
+            if (state) state.isLoggedIn = true;
         },
-        closeWindow: function () {
-            // Mock implementation - no-op for testing
+        logout: () => {
+            const state = mockStateMap.get(liffInstance);
+            if (state) state.isLoggedIn = false;
         },
-        logout: function (): void {
-            const state = mockStateMap.get(liff);
-            if (state) {
-                state.isLoggedIn = false;
-            }
-        },
-        sendMessages: function (messages: any[]): Promise<void> {
-            return Promise.resolve();
-        },
-        openWindow: function (params: { url: string; external?: boolean }): void {
-            // Mock implementation - no-op for testing
-        },
-        shareTargetPicker: function (messages: any[], options?: { isMultiple?: boolean }): Promise<any> {
-            return Promise.resolve(null);
-        },
-        getFriendship: function (): Promise<{ friendFlag: boolean }> {
-            return Promise.resolve({ friendFlag: true });
-        },
+        closeWindow: () => {},
+        sendMessages: () => Promise.resolve(),
+        openWindow: () => {},
+        shareTargetPicker: () => Promise.resolve(null),
+        getFriendship: () => Promise.resolve({ friendFlag: true }),
+    };
+
+    // Use Object.defineProperty to overwrite properties even if they are read-only in the original object
+    Object.keys(mockMethods).forEach(key => {
+        Object.defineProperty(liffInstance, key, {
+            value: mockMethods[key],
+            writable: true,
+            configurable: true
+        });
     });
 };
