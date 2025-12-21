@@ -3,8 +3,6 @@ import { renderProfile } from './pages/Profile';
 import { renderTerms } from './pages/Terms';
 import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer } from './pages/Unsubscribe';
 import { config } from './config';
-import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './shared-constants';
-import { setupMockLiff } from './test-mock-liff';
 import './style.css';
 
 const app = document.getElementById('app') as HTMLElement;
@@ -49,25 +47,16 @@ const initLiff = async (): Promise<void> => {
         }
 
         // Mock the LIFF SDK when running in test mode.
-        // This block is used for E2E testing with Playwright and enables local testing
-        // without a real LINE environment by providing a mock implementation of the LIFF API.
         // SECURITY: Ensure this only runs in DEV mode and explicitly enabled.
-        // CAUTION: VITE_ENABLE_MOCK_LIFF must NEVER be set to 'true' in a production build.
-        // While import.meta.env.DEV prevents execution during development, setting the env var
-        // in a production build pipeline could potentially expose the mock if DEV check fails or is overridden.
-        const enableMockLiff = import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true';
-        console.log('DEBUG: Checking Mock LIFF condition:', {
-            enableMockLiff,
-            liffId,
-            isTestId: [TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId),
-            isDev: import.meta.env.DEV
-        });
+        if (import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true' && import.meta.env.DEV) {
+            // Dynamic import to keep test utilities out of production bundle
+            const { setupMockLiff } = await import('./test/setup-mock-liff');
+            const { TEST_LIFF_ID, TEST_CHANNEL_ID } = await import('./shared-constants');
 
-        if (enableMockLiff && [TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId) && import.meta.env.DEV) {
-            console.log('DEBUG: Setting up Mock LIFF');
-            setupMockLiff();
-            // Even in mock mode, we must call init() to satisfy the promise chain,
-            // although the mock implementation of init() resolves immediately.
+            if ([TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId)) {
+                console.log('DEBUG: Setting up Mock LIFF');
+                setupMockLiff();
+            }
         }
 
         await liff.init({ liffId });

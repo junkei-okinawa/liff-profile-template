@@ -1,11 +1,12 @@
 // Mock implementation of @line/liff
 // This file is used via Vite alias replacement when VITE_ENABLE_MOCK_LIFF is true.
+import type { LiffConfig } from '@line/liff';
 
 let isLoggedIn = true;
 
 const mockLiff = {
     id: 'mock-liff-id',
-    init: (config: any) => {
+    init: (config: LiffConfig) => {
         console.log('[Mock LIFF] init called', config);
         const liffId = config?.liffId;
         if (typeof liffId !== 'string' || liffId.trim() === '') {
@@ -43,13 +44,13 @@ const mockLiff = {
         endpoint: 'https://example.com'
     }),
     closeWindow: () => {},
-    sendMessages: () => Promise.resolve(),
-    openWindow: () => {},
-    shareTargetPicker: () => Promise.resolve(null),
+    sendMessages: (messages: any[]) => Promise.resolve(),
+    openWindow: (params: { url: string; external?: boolean }) => {},
+    shareTargetPicker: (messages: any[], options?: { isMultiple?: boolean }) => Promise.resolve(null),
     getFriendship: () => Promise.resolve({ friendFlag: true }),
     
     // Test utilities
-    _reset: () => { isLoggedIn = false; }
+    _reset: () => { isLoggedIn = true; }
 };
 
 export default mockLiff;

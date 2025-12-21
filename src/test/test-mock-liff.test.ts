@@ -23,24 +23,24 @@ describe('Mock LIFF', () => {
 
     it('should initialize with valid liffId', async () => {
         expect(liff.init).toBeDefined();
-        await expect(liff.init({ liffId: 'valid-id' })).resolves.not.toThrow();
+        await expect(liff.init({ liffId: 'valid-id' })).resolves.toBeUndefined();
     });
 
     it('should reject init with invalid liffId', async () => {
-        await expect(liff.init({ liffId: '' })).rejects.toThrow('Invalid liffId');
+        await expect(liff.init({ liffId: '' })).rejects.toThrow('[Mock LIFF] Invalid liffId');
         // @ts-ignore
-        await expect(liff.init({})).rejects.toThrow('Invalid liffId');
+        await expect(liff.init({})).rejects.toThrow('[Mock LIFF] Invalid liffId');
     });
 
     it('should handle login state', () => {
-        // Initial state is false after reset
-        expect(liff.isLoggedIn()).toBe(false); 
+        // Initial state is true after reset in liff-mock.ts
+        expect(liff.isLoggedIn()).toBe(true); 
         
-        liff.login();
-        expect(liff.isLoggedIn()).toBe(true);
-
         liff.logout();
         expect(liff.isLoggedIn()).toBe(false);
+
+        liff.login();
+        expect(liff.isLoggedIn()).toBe(true);
     });
 
     it('should return mock profile', async () => {
