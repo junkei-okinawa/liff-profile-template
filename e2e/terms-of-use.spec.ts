@@ -16,6 +16,47 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('should allow user to agree to terms and persist agreement state', async ({ page }) => {
+    // Mock API State
+    let isAgreed = false;
+    const mockUserId = 'U00000000000000000000000000000000';
+
+    // Mock GET /api/users/{userId}/status
+    await page.route(`**/api/users/${mockUserId}/status`, async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                userId: mockUserId,
+                agreed: isAgreed,
+                termsAcceptedAt: isAgreed ? new Date().toISOString() : null
+            })
+        });
+    });
+
+    // Mock POST /api/users/{userId}/agreement
+    await page.route(`**/api/users/${mockUserId}/agreement`, async route => {
+        const body = route.request().postDataJSON();
+        if (body && body.agreed) {
+            isAgreed = true;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    status: 'success',
+                    userId: mockUserId,
+                    agreed: true,
+                    termsAcceptedAt: new Date().toISOString()
+                })
+            });
+        } else {
+            await route.fulfill({
+                status: 400,
+                contentType: 'application/json',
+                body: JSON.stringify({ error: 'Invalid request' })
+            });
+        }
+    });
+
     // 1. Go to Profile page and verify authentication
 
     const response = await page.goto('/');

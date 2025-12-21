@@ -9,11 +9,19 @@ const mockStateMap = new WeakMap<typeof liff, MockLiffState>();
 
 // Reset the mock state to initial values
 export const resetMockLiff = () => {
-    const state = mockStateMap.get(liff);
-    if (state) {
-        state.isLoggedIn = true;
+    let state = mockStateMap.get(liff);
+    if (!state) {
+        state = { isLoggedIn: true };
+        mockStateMap.set(liff, state);
+        return;
     }
+    state.isLoggedIn = true;
 };
+
+// Expose resetMockLiff to window for E2E tests
+if (typeof window !== 'undefined') {
+    (window as any).resetMockLiff = resetMockLiff;
+}
 
 export const setupMockLiff = () => {
     // Ensure clean state on setup
@@ -28,8 +36,8 @@ export const setupMockLiff = () => {
     });
 
     Object.assign(liff, {
-        init: function (config?: { liffId?: string }) {
-            const liffId = config && (config as any).liffId;
+        init: function (config?: { liffId: string }) {
+            const liffId = config?.liffId;
             if (typeof liffId !== 'string' || liffId.trim() === '') {
                 return Promise.reject(new Error('[Mock LIFF] Invalid liffId passed to init'));
             }
@@ -59,7 +67,7 @@ export const setupMockLiff = () => {
             accessToken: 'mock-access-token',
             endpoint: 'https://example.com'
         }),
-        login: function () {
+        login: function (loginConfig?: { redirectUri?: string }): void {
             const state = mockStateMap.get(liff);
             if (state) {
                 state.isLoggedIn = true;
@@ -68,22 +76,22 @@ export const setupMockLiff = () => {
         closeWindow: function () {
             // Mock implementation - no-op for testing
         },
-        logout: function () {
+        logout: function (): void {
             const state = mockStateMap.get(liff);
             if (state) {
                 state.isLoggedIn = false;
             }
         },
-        sendMessages: function () {
+        sendMessages: function (messages: any[]): Promise<void> {
             return Promise.resolve();
         },
-        openWindow: function () {
+        openWindow: function (params: { url: string; external?: boolean }): void {
             // Mock implementation - no-op for testing
         },
-        shareTargetPicker: function () {
-            return Promise.resolve();
+        shareTargetPicker: function (messages: any[], options?: { isMultiple?: boolean }): Promise<any> {
+            return Promise.resolve(null);
         },
-        getFriendship: function () {
+        getFriendship: function (): Promise<{ friendFlag: boolean }> {
             return Promise.resolve({ friendFlag: true });
         },
     });

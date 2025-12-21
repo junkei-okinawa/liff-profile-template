@@ -52,6 +52,9 @@ const initLiff = async (): Promise<void> => {
         // This block is used for E2E testing with Playwright and enables local testing
         // without a real LINE environment by providing a mock implementation of the LIFF API.
         // SECURITY: Ensure this only runs in DEV mode and explicitly enabled.
+        // CAUTION: VITE_ENABLE_MOCK_LIFF must NEVER be set to 'true' in a production build.
+        // While import.meta.env.DEV prevents execution during development, setting the env var
+        // in a production build pipeline could potentially expose the mock if DEV check fails or is overridden.
         const enableMockLiff = import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true';
         if (enableMockLiff && [TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId) && import.meta.env.DEV) {
             // NOTE: This block is strictly for development/testing customization.
