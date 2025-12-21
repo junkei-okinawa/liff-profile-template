@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import liff from '@line/liff';
 import { TEST_USER_ID } from '../shared-constants';
 

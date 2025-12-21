@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   
   const alias = {}
-  if (env.VITE_ENABLE_MOCK_LIFF === 'true' || mode === 'test') {
+  if ((env.VITE_ENABLE_MOCK_LIFF === 'true' && mode === 'development') || mode === 'test') {
     console.log('Enabling Mock LIFF via alias replacement');
     alias['@line/liff'] = path.resolve(__dirname, 'src/test/liff-mock.ts')
   }

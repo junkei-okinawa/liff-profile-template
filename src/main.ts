@@ -54,7 +54,6 @@ const initLiff = async (): Promise<void> => {
             const { TEST_LIFF_ID, TEST_CHANNEL_ID } = await import('./shared-constants');
 
             if ([TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId)) {
-                console.log('DEBUG: Setting up Mock LIFF');
                 setupMockLiff();
             }
         }

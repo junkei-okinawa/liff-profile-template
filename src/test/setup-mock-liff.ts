@@ -10,8 +10,8 @@ export const resetMockLiff = () => {
     }
 };
 
-// Expose resetMockLiff to window for E2E tests ONLY in mock mode
-if (typeof window !== 'undefined' && import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true') {
+// Expose resetMockLiff to window for E2E tests ONLY in mock mode and DEV environment
+if (typeof window !== 'undefined' && import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true' && import.meta.env.DEV) {
     (window as any).resetMockLiff = resetMockLiff;
 }
 
@@ -21,8 +21,8 @@ export const setupMockLiff = () => {
         // Reset mock state so each invocation starts from a known baseline
         resetMockLiff();
 
-        // Re-expose resetMockLiff on window (idempotent) for E2E tests
-        if (typeof window !== 'undefined') {
+        // Re-expose resetMockLiff on window (idempotent) for E2E tests, but only in mock mode
+        if (typeof window !== 'undefined' && import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true') {
             (window as any).resetMockLiff = resetMockLiff;
         }
     }
