@@ -37,7 +37,6 @@ const router = async (): Promise<void> => {
         }
     }
 };
-
 // Initialize LIFF
 const initLiff = async (): Promise<void> => {
     try {
@@ -45,6 +44,18 @@ const initLiff = async (): Promise<void> => {
 
         if (!liffId) {
             throw new Error('LIFF ID is not configured (VITE_CHANNEL_ID or VITE_LIFF_ID must be set)');
+        }
+
+        // Mock the LIFF SDK when running in test mode.
+        // SECURITY: Ensure this only runs in DEV mode and explicitly enabled.
+        if (import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true' && import.meta.env.DEV) {
+            // Dynamic import to keep test utilities out of production bundle
+            const { setupMockLiff } = await import('./test/setup-mock-liff');
+            const { TEST_LIFF_ID, TEST_CHANNEL_ID } = await import('./shared-constants');
+
+            if ([TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId)) {
+                setupMockLiff();
+            }
         }
 
         await liff.init({ liffId });
@@ -56,17 +67,13 @@ const initLiff = async (): Promise<void> => {
         }
 
         const context = liff.getContext();
+        // If context/userId is missing (e.g. app opened in an external browser outside the LINE app environment), try getProfile as fallback
         if (!context || !context.userId) {
-            // If getContext is null (likely in external browser), try to get profile as fallback.
             try {
                 const profile = await liff.getProfile();
-                // If getProfile succeeds, we have a valid user session.
-                // Note: We don't store the profile here, just verifying we can get it.
-                // The pages will fetch what they need.
                 console.log('Context not found but profile retrieved:', profile.userId);
             } catch (e) {
-                // If getProfile also fails, show error or force login as last resort.
-                console.warn('No context/userId and getProfile failed, redirecting to login...', e);
+                console.warn('No session found, redirecting to login...', e);
                 liff.login({ redirectUri: config.callbackUrl || window.location.href });
                 return;
             }

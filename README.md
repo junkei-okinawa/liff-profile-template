@@ -50,6 +50,28 @@ npm run dev
 
 `http://localhost:3000` でアプリケーションが起動します。
 
+## テスト
+
+本プロジェクトでは `Vitest` を使用してテストを行います。
+
+### ユニットテスト・統合テストの実行
+
+```bash
+# ウォッチモードで実行
+npm run test
+
+# CIモードで実行（一回のみ実行）
+npm run test:ci
+```
+
+### E2Eテストの実行
+
+Playwrightを使用したE2Eテストを実行します。
+
+```bash
+npx playwright test
+```
+
 ## 技術スタック
 
 - **Frontend**: TypeScript, Vanilla JS (No Framework)
