@@ -43,7 +43,7 @@ const initLiff = async (): Promise<void> => {
         const liffId = config.liffId;
 
         if (!liffId) {
-            throw new Error('LIFF ID is not configured (VITE_CHANNEL_ID or VITE_LIFF_ID must be set)');
+            throw new Error('LIFF ID is not configured (VITE_LIFF_ID must be set)');
         }
 
         // Mock the LIFF SDK when running in test mode.
