@@ -43,7 +43,7 @@ describe('Config Module', () => {
     it('should return correct values from config getters', () => {
       (window as any)._env_ = {
         VITE_API_BASE_URL: 'https://api.example.com',
-        VITE_CHANNEL_ID: '1234567890',
+        VITE_LIFF_ID: '1234567890',
         VITE_CALLBACK_URL: 'https://example.com/callback'
       };
 
@@ -52,12 +52,11 @@ describe('Config Module', () => {
       expect(config.callbackUrl).toBe('https://example.com/callback');
     });
 
-    it('should fallback to VITE_LIFF_ID if VITE_CHANNEL_ID is missing', () => {
+    it('should read liffId from VITE_LIFF_ID', () => {
       (window as any)._env_ = {
         VITE_LIFF_ID: 'fallback-liff-id'
       };
 
-      vi.stubEnv('VITE_CHANNEL_ID', '');
       expect(config.liffId).toBe('fallback-liff-id');
     });
   });
