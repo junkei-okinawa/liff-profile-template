@@ -54,10 +54,10 @@ describe('Config Module', () => {
 
     it('should read liffId from VITE_LIFF_ID', () => {
       (window as any)._env_ = {
-        VITE_LIFF_ID: 'fallback-liff-id'
+        VITE_LIFF_ID: 'test-liff-id'
       };
 
-      expect(config.liffId).toBe('fallback-liff-id');
+      expect(config.liffId).toBe('test-liff-id');
     });
   });
 
