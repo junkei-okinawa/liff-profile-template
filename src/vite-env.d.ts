@@ -7,7 +7,7 @@ interface Window {
 }
 
 interface ImportMetaEnv {
-    readonly VITE_CHANNEL_ID: string
+    readonly VITE_LIFF_ID: string
     readonly VITE_CHANNEL_SECRET: string
     readonly VITE_CALLBACK_URL: string
     readonly VITE_API_BASE_URL: string
