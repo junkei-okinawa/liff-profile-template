@@ -43,7 +43,7 @@ const initLiff = async (): Promise<void> => {
         const liffId = config.liffId;
 
         if (!liffId) {
-            throw new Error('LIFF ID is not configured (VITE_CHANNEL_ID or VITE_LIFF_ID must be set)');
+            throw new Error('LIFF ID is not configured (VITE_LIFF_ID must be set)');
         }
 
         // Mock the LIFF SDK when running in test mode.
@@ -51,9 +51,9 @@ const initLiff = async (): Promise<void> => {
         if (import.meta.env.VITE_ENABLE_MOCK_LIFF === 'true' && import.meta.env.DEV) {
             // Dynamic import to keep test utilities out of production bundle
             const { setupMockLiff } = await import('./test/setup-mock-liff');
-            const { TEST_LIFF_ID, TEST_CHANNEL_ID } = await import('./shared-constants');
+            const { TEST_LIFF_ID } = await import('./shared-constants');
 
-            if ([TEST_LIFF_ID, TEST_CHANNEL_ID].includes(liffId)) {
+            if (liffId === TEST_LIFF_ID) {
                 setupMockLiff();
             }
         }

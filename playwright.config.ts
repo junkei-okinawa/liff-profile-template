@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-import { TEST_LIFF_ID, TEST_CHANNEL_ID } from './src/shared-constants';
+import { TEST_LIFF_ID } from './src/shared-constants';
 
 export default defineConfig({
     testDir: './e2e',
@@ -28,7 +28,6 @@ export default defineConfig({
         env: {
             ...process.env,
             VITE_LIFF_ID: process.env.VITE_LIFF_ID || TEST_LIFF_ID,
-            VITE_CHANNEL_ID: process.env.VITE_CHANNEL_ID || TEST_CHANNEL_ID,
             VITE_ENABLE_MOCK_LIFF: 'true',
         },
     },
