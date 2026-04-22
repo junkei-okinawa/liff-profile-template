@@ -211,9 +211,10 @@ describe('Terms Page', () => {
     expect(container.querySelector('#agree-btn')).not.toBeInTheDocument();
   });
 
-  it('shows consent button when termsAcceptedAt is null (no date record)', async () => {
-    // termsAcceptedAt が null の場合は同意日の記録がないため未同意扱いとする
-    // （規約更新時に必ず再同意を取得するため）
+  it('shows initial consent button (not re-consent notice) when termsAcceptedAt is null', async () => {
+    // termsAcceptedAt が null の場合は同意日の記録がないため未同意扱いとする。
+    // このケースでは「利用規約が更新されました」という再同意メッセージは表示されず、
+    // 通常の初回同意ボタンのみが表示されることを検証する。
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
@@ -229,7 +230,9 @@ describe('Terms Page', () => {
     const agreeBtn = container.querySelector('#agree-btn');
     expect(agreeBtn).toBeInTheDocument();
     expect(agreeBtn).toHaveTextContent('規約に同意する');
-    expect(container.innerHTML).not.toContain('規約に同意済みです');
+    // 再同意通知（利用規約更新メッセージ）は表示されない
+    expect(container.innerHTML).not.toContain('利用規約が更新されました');
+    expect(container.innerHTML).not.toContain('更新された規約に同意する');
   });
 
   it('shows error if ID token is missing', async () => {

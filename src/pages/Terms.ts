@@ -4,6 +4,9 @@ import liff from '@line/liff';
 import { config } from '../config';
 import { TERMS_UPDATED_AT } from '../shared-constants';
 
+// モジュールスコープで一度だけパースして再利用する
+const TERMS_UPDATED_AT_DATE = new Date(TERMS_UPDATED_AT);
+
 export const renderTerms = async (container: HTMLElement): Promise<void> => {
     container.innerHTML = '<div class="loading">規約を読み込み中...</div>';
 
@@ -112,8 +115,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         // agreed フラグに関わらず未同意扱いとする（規約更新時に必ず再同意を取得するため）。
         if (statusData.termsAcceptedAt) {
             const acceptedAt = new Date(statusData.termsAcceptedAt);
-            const updatedAt = new Date(TERMS_UPDATED_AT);
-            hasAgreed = acceptedAt >= updatedAt;
+            hasAgreed = acceptedAt >= TERMS_UPDATED_AT_DATE;
             isReconsent = !hasAgreed;
         } else {
             hasAgreed = false;
