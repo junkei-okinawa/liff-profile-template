@@ -69,10 +69,10 @@ describe('Terms Page', () => {
         ok: true,
         text: () => Promise.resolve('# Terms'),
       })
-      // Mock fetch for status API
+      // Mock fetch for status API (termsAcceptedAt なし = 未同意)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ agreed: false }),
+        json: () => Promise.resolve({ termsAcceptedAt: null }),
       });
 
     await renderTerms(container);
@@ -103,10 +103,10 @@ describe('Terms Page', () => {
         ok: true,
         text: () => Promise.resolve('# Terms'),
       })
-      // Mock fetch for status API
+      // Mock fetch for status API (最新規約より新しい同意日)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ agreed: true }),
+        json: () => Promise.resolve({ termsAcceptedAt: '2099-01-01T00:00:00.000Z' }),
       });
 
     await renderTerms(container);
@@ -123,10 +123,10 @@ describe('Terms Page', () => {
         ok: true,
         text: () => Promise.resolve('# Terms'),
       })
-      // Mock fetch for status API (initially not agreed)
+      // Mock fetch for status API (termsAcceptedAt なし = 未同意)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ agreed: false }),
+        json: () => Promise.resolve({ termsAcceptedAt: null }),
       });
 
     await renderTerms(container);
@@ -161,6 +161,75 @@ describe('Terms Page', () => {
 
     // Check if UI updated
     expect(container.innerHTML).toContain('規約に同意済みです');
+  });
+
+  it('shows re-consent button when termsAcceptedAt is older than TERMS_UPDATED_AT', async () => {
+    // Mock fetch for terms.md
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      // 利用規約更新日より古い同意日を返す
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          termsAcceptedAt: '2020-01-01T00:00:00.000Z', // 明らかに古い日付
+        }),
+      });
+
+    await renderTerms(container);
+
+    // 再同意ボタンが表示される
+    const agreeBtn = container.querySelector('#agree-btn');
+    expect(agreeBtn).toBeInTheDocument();
+    expect(agreeBtn).toHaveTextContent('更新された規約に同意する');
+
+    // 更新通知メッセージが表示される
+    expect(container.innerHTML).toContain('利用規約が更新されました');
+  });
+
+  it('shows agreed message when termsAcceptedAt is newer than TERMS_UPDATED_AT', async () => {
+    // Mock fetch for terms.md
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      // 利用規約更新日より新しい同意日を返す
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          termsAcceptedAt: '2099-01-01T00:00:00.000Z', // 十分に新しい日付
+        }),
+      });
+
+    await renderTerms(container);
+
+    // 同意済みメッセージが表示される
+    expect(container.innerHTML).toContain('規約に同意済みです');
+    expect(container.querySelector('#agree-btn')).not.toBeInTheDocument();
+  });
+
+  it('shows consent button when termsAcceptedAt is null (no date record)', async () => {
+    // termsAcceptedAt が null の場合は同意日の記録がないため未同意扱いとする
+    // （規約更新時に必ず再同意を取得するため）
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ termsAcceptedAt: null }),
+      });
+
+    await renderTerms(container);
+
+    const agreeBtn = container.querySelector('#agree-btn');
+    expect(agreeBtn).toBeInTheDocument();
+    expect(agreeBtn).toHaveTextContent('規約に同意する');
+    expect(container.innerHTML).not.toContain('規約に同意済みです');
   });
 
   it('shows error if ID token is missing', async () => {

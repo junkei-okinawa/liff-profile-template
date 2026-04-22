@@ -64,6 +64,7 @@ const getAuthToken = (): string => {
 const checkAgreementStatus = async (container: HTMLElement) => {
     let userId = '';
     let hasAgreed = false;
+    let isReconsent = false;
 
     try {
         if (liff.isInClient() || liff.isLoggedIn()) {
@@ -106,13 +107,16 @@ const checkAgreementStatus = async (container: HTMLElement) => {
 
         const statusData = await statusResponse.json();
 
-        // 同意日が最新の利用規約更新日より古い場合は未同意扱い（再同意が必要）
-        if (statusData.agreed && statusData.termsAcceptedAt) {
+        // termsAcceptedAt が存在する場合のみ最新の利用規約更新日と比較する。
+        // termsAcceptedAt が null/未設定の場合は同意日の記録がないため、
+        // agreed フラグに関わらず未同意扱いとする（規約更新時に必ず再同意を取得するため）。
+        if (statusData.termsAcceptedAt) {
             const acceptedAt = new Date(statusData.termsAcceptedAt);
             const updatedAt = new Date(TERMS_UPDATED_AT);
             hasAgreed = acceptedAt >= updatedAt;
+            isReconsent = !hasAgreed;
         } else {
-            hasAgreed = statusData.agreed;
+            hasAgreed = false;
         }
 
     } catch (e) {
@@ -130,8 +134,6 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         if (hasAgreed) {
             agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意済みです</p>';
         } else {
-            const isReconsent = statusData.agreed && statusData.termsAcceptedAt
-                && new Date(statusData.termsAcceptedAt) < new Date(TERMS_UPDATED_AT);
             const btnLabel = isReconsent ? '更新された規約に同意する' : '規約に同意する';
             const notice = isReconsent
                 ? '<p style="color: #e65c00; font-weight: bold; margin-bottom: 8px;">利用規約が更新されました。引き続きご利用いただくには再度ご同意ください。</p>'
