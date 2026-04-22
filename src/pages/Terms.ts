@@ -2,6 +2,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import liff from '@line/liff';
 import { config } from '../config';
+import { TERMS_UPDATED_AT } from '../shared-constants';
 
 export const renderTerms = async (container: HTMLElement): Promise<void> => {
     container.innerHTML = '<div class="loading">規約を読み込み中...</div>';
@@ -104,7 +105,15 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         }
 
         const statusData = await statusResponse.json();
-        hasAgreed = statusData.agreed;
+
+        // 同意日が最新の利用規約更新日より古い場合は未同意扱い（再同意が必要）
+        if (statusData.agreed && statusData.termsAcceptedAt) {
+            const acceptedAt = new Date(statusData.termsAcceptedAt);
+            const updatedAt = new Date(TERMS_UPDATED_AT);
+            hasAgreed = acceptedAt >= updatedAt;
+        } else {
+            hasAgreed = statusData.agreed;
+        }
 
     } catch (e) {
         console.error('API check failed', e);
@@ -121,10 +130,17 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         if (hasAgreed) {
             agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意済みです</p>';
         } else {
+            const isReconsent = statusData.agreed && statusData.termsAcceptedAt
+                && new Date(statusData.termsAcceptedAt) < new Date(TERMS_UPDATED_AT);
+            const btnLabel = isReconsent ? '更新された規約に同意する' : '規約に同意する';
+            const notice = isReconsent
+                ? '<p style="color: #e65c00; font-weight: bold; margin-bottom: 8px;">利用規約が更新されました。引き続きご利用いただくには再度ご同意ください。</p>'
+                : '';
             // userId is guaranteed to be present here due to validation above
             agreementSection.innerHTML = `
+          ${notice}
           <button id="agree-btn" style="padding: 12px 24px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-bottom: 10px;">
-            規約に同意する
+            ${btnLabel}
           </button>
         `;
 
