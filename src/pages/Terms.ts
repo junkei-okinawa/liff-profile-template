@@ -2,6 +2,16 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import liff from '@line/liff';
 import { config } from '../config';
+import { TERMS_UPDATED_AT } from '../shared-constants';
+
+// モジュールスコープで一度だけパースして再利用する
+// 不正な日付文字列に対しては「十分先の未来」にフォールバックし、
+// acceptedAt >= TERMS_UPDATED_AT_DATE が常に false となるため
+// すべての同意日を「古い」と見なして再同意を促す（fail-closed）。
+const _parsedTermsDate = new Date(TERMS_UPDATED_AT);
+const TERMS_UPDATED_AT_DATE = isNaN(_parsedTermsDate.getTime())
+    ? new Date(8640000000000000) // JS Date の最大値（year 275760）
+    : _parsedTermsDate;
 
 export const renderTerms = async (container: HTMLElement): Promise<void> => {
     container.innerHTML = '<div class="loading">規約を読み込み中...</div>';
@@ -63,6 +73,7 @@ const getAuthToken = (): string => {
 const checkAgreementStatus = async (container: HTMLElement) => {
     let userId = '';
     let hasAgreed = false;
+    let isReconsent = false;
 
     try {
         if (liff.isInClient() || liff.isLoggedIn()) {
@@ -104,7 +115,25 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         }
 
         const statusData = await statusResponse.json();
-        hasAgreed = statusData.agreed;
+
+        // termsAcceptedAt が存在する場合のみ最新の利用規約更新日と比較する。
+        // termsAcceptedAt が null/未設定の場合は同意日の記録がないため、
+        // agreed フラグに関わらず未同意扱いとする（規約更新時に必ず再同意を取得するため）。
+        if (statusData.termsAcceptedAt) {
+            const acceptedAt = new Date(statusData.termsAcceptedAt);
+            if (isNaN(acceptedAt.getTime())) {
+                // 日付パース失敗: データ不正のため初回同意扱いとする。
+                // 「利用規約が更新されました」（再同意通知）を表示すると誤解を招くため、
+                // isReconsent = false のまま通常の初回同意ボタンを表示する。
+                hasAgreed = false;
+                isReconsent = false;
+            } else {
+                hasAgreed = acceptedAt >= TERMS_UPDATED_AT_DATE;
+                isReconsent = !hasAgreed;
+            }
+        } else {
+            hasAgreed = false;
+        }
 
     } catch (e) {
         console.error('API check failed', e);
@@ -121,10 +150,15 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         if (hasAgreed) {
             agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意済みです</p>';
         } else {
+            const btnLabel = isReconsent ? '更新された規約に同意する' : '規約に同意する';
+            const notice = isReconsent
+                ? '<p style="color: #e65c00; font-weight: bold; margin-bottom: 8px;">利用規約が更新されました。引き続きご利用いただくには再度ご同意ください。</p>'
+                : '';
             // userId is guaranteed to be present here due to validation above
             agreementSection.innerHTML = `
+          ${notice}
           <button id="agree-btn" style="padding: 12px 24px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-bottom: 10px;">
-            規約に同意する
+            ${btnLabel}
           </button>
         `;
 
@@ -144,6 +178,7 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
         return;
     }
 
+    const originalLabel = btn.textContent ?? '規約に同意する';
     btn.disabled = true;
     btn.textContent = '処理中...';
 
@@ -178,6 +213,6 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
         console.error('Agreement failed', e);
         alert('規約への同意処理中にエラーが発生しました。もう一度お試しください。');
         btn.disabled = false;
-        btn.textContent = '規約に同意する';
+        btn.textContent = originalLabel;
     }
 };
