@@ -235,6 +235,29 @@ describe('Terms Page', () => {
     expect(container.innerHTML).not.toContain('更新された規約に同意する');
   });
 
+  it('shows initial consent button (not re-consent notice) when termsAcceptedAt is invalid date string', async () => {
+    // termsAcceptedAt が truthy だが Invalid Date の場合は初回同意扱いとする。
+    // データ不正時に「利用規約が更新されました」という誤った再同意通知を表示しないことを検証する。
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ termsAcceptedAt: 'not-a-date' }),
+      });
+
+    await renderTerms(container);
+
+    const agreeBtn = container.querySelector('#agree-btn');
+    expect(agreeBtn).toBeInTheDocument();
+    expect(agreeBtn).toHaveTextContent('規約に同意する');
+    // 再同意通知（データ不正なのに「利用規約が更新されました」）は表示されない
+    expect(container.innerHTML).not.toContain('利用規約が更新されました');
+    expect(container.innerHTML).not.toContain('更新された規約に同意する');
+  });
+
   it('shows error if ID token is missing', async () => {
     (liff.getIDToken as any).mockReturnValue(null);
 
