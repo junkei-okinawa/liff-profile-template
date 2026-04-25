@@ -6,10 +6,15 @@ export const TEST_LIFF_ID = 'test-liff-id';
 
 /**
  * 最新の利用規約更新日（ISO 8601 形式）。
- * 利用規約を更新した際はこの値を更新すること。
+ * `VITE_TERMS_UPDATED_AT` 環境変数が設定されていればその値を使用し、
+ * 未設定時はデフォルト値を使用する。
  * ユーザーの同意日がこの日付より古い場合、再同意を求める。
  */
-export const TERMS_UPDATED_AT = '2026-04-21T00:00:00.000Z';
+const DEFAULT_TERMS_UPDATED_AT = '2026-04-21T00:00:00.000Z';
+
+export const TERMS_UPDATED_AT =
+  (import.meta.env.VITE_TERMS_UPDATED_AT as string | undefined)?.trim() ||
+  DEFAULT_TERMS_UPDATED_AT;
 
 
 /**

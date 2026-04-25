@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderTerms } from '../pages/Terms';
+import { TERMS_UPDATED_AT } from '../shared-constants';
 import liff from '@line/liff';
 
 // Mock @line/liff
@@ -96,24 +97,23 @@ describe('Terms Page', () => {
     expect(agreeBtn).toHaveTextContent('規約に同意する');
   });
 
-  it('renders terms content and checks agreement status (already agreed)', async () => {
-    // Mock fetch for terms.md
+  it('shows agreed message when termsAcceptedAt equals TERMS_UPDATED_AT (boundary: no re-consent)', async () => {
+    // TERMS_UPDATED_AT と同日の同意日は「ちょうど同意済み」= 再同意不要
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve('# Terms'),
       })
-      // Mock fetch for status API (最新規約より新しい同意日)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ termsAcceptedAt: '2099-01-01T00:00:00.000Z' }),
+        json: () => Promise.resolve({ termsAcceptedAt: TERMS_UPDATED_AT }),
       });
 
     await renderTerms(container);
 
-    // Check if status message is shown
     expect(container.innerHTML).toContain('規約に同意済みです');
     expect(container.querySelector('#agree-btn')).not.toBeInTheDocument();
+    expect(container.innerHTML).not.toContain('利用規約が更新されました');
   });
 
   it('handles agreement action correctly', async () => {
