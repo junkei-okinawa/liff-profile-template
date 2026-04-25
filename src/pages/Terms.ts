@@ -5,10 +5,13 @@ import { config } from '../config';
 import { TERMS_UPDATED_AT } from '../shared-constants';
 
 // モジュールスコープで一度だけパースして再利用する
-// 不正な日付文字列に対しては epoch (1970-01-01) にフォールバックし、
-// すべての同意日を「古い」と見なすことで再同意を促す（fail-safe）。
+// 不正な日付文字列に対しては「十分先の未来」にフォールバックし、
+// acceptedAt >= TERMS_UPDATED_AT_DATE が常に false となるため
+// すべての同意日を「古い」と見なして再同意を促す（fail-closed）。
 const _parsedTermsDate = new Date(TERMS_UPDATED_AT);
-const TERMS_UPDATED_AT_DATE = isNaN(_parsedTermsDate.getTime()) ? new Date(0) : _parsedTermsDate;
+const TERMS_UPDATED_AT_DATE = isNaN(_parsedTermsDate.getTime())
+    ? new Date(8640000000000000) // JS Date の最大値（year 275760）
+    : _parsedTermsDate;
 
 export const renderTerms = async (container: HTMLElement): Promise<void> => {
     container.innerHTML = '<div class="loading">規約を読み込み中...</div>';
