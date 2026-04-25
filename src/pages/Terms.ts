@@ -118,8 +118,16 @@ const checkAgreementStatus = async (container: HTMLElement) => {
         // agreed フラグに関わらず未同意扱いとする（規約更新時に必ず再同意を取得するため）。
         if (statusData.termsAcceptedAt) {
             const acceptedAt = new Date(statusData.termsAcceptedAt);
-            hasAgreed = acceptedAt >= TERMS_UPDATED_AT_DATE;
-            isReconsent = !hasAgreed;
+            if (isNaN(acceptedAt.getTime())) {
+                // 日付パース失敗: データ不正のため初回同意扱いとする。
+                // 「利用規約が更新されました」（再同意通知）を表示すると誤解を招くため、
+                // isReconsent = false のまま通常の初回同意ボタンを表示する。
+                hasAgreed = false;
+                isReconsent = false;
+            } else {
+                hasAgreed = acceptedAt >= TERMS_UPDATED_AT_DATE;
+                isReconsent = !hasAgreed;
+            }
         } else {
             hasAgreed = false;
         }
