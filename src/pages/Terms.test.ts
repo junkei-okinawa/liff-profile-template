@@ -174,7 +174,8 @@ describe('Terms Page', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
-          termsAcceptedAt: '2020-01-01T00:00:00.000Z', // 明らかに古い日付
+          // TERMS_UPDATED_AT より 1 日前: 環境変数で更新日が変わっても相対的に「古い」ことを保証
+          termsAcceptedAt: new Date(new Date(TERMS_UPDATED_AT).getTime() - 24 * 60 * 60 * 1000).toISOString(),
         }),
       });
 
@@ -200,7 +201,8 @@ describe('Terms Page', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
-          termsAcceptedAt: '2099-01-01T00:00:00.000Z', // 十分に新しい日付
+          // TERMS_UPDATED_AT より 1 日後: 環境変数で更新日が変わっても相対的に「新しい」ことを保証
+          termsAcceptedAt: new Date(new Date(TERMS_UPDATED_AT).getTime() + 24 * 60 * 60 * 1000).toISOString(),
         }),
       });
 
