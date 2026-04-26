@@ -274,4 +274,28 @@ describe('Terms Page', () => {
     // Should show error in agreement section
     expect(container.innerHTML).toContain('同意状況の確認中にエラーが発生しました');
   });
+
+  it('shows session expired message with reload button when status API returns 401', async () => {
+    // status API が 401 を返した場合（LINE ID トークン期限切れ）、
+    // 汎用エラーではなく「セッションが切れました」メッセージと再読み込みボタンが表示される。
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+    await renderTerms(container);
+
+    expect(container.innerHTML).toContain('セッションが切れました');
+    expect(container.innerHTML).toContain('ページを再読み込みして再度お試しください');
+    const reloadBtn = container.querySelector('#reload-btn');
+    expect(reloadBtn).toBeInTheDocument();
+    // 汎用エラーメッセージは表示されない
+    expect(container.innerHTML).not.toContain('同意状況の確認中にエラーが発生しました');
+  });
 });
