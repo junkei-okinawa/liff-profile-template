@@ -43,6 +43,12 @@ describe('Terms Page', () => {
     // Suppress console.error for expected errors
     vi.spyOn(console, 'error').mockImplementation(() => { });
 
+    // Mock window.location.reload (same pattern as Profile.test.ts / Unsubscribe.test.ts)
+    Object.defineProperty(window, 'location', {
+      value: { reload: vi.fn() },
+      writable: true,
+    });
+
     // Setup environment variables
     (window as any)._env_ = {
       VITE_API_BASE_URL: mockApiBaseUrl
@@ -293,9 +299,12 @@ describe('Terms Page', () => {
 
     expect(container.innerHTML).toContain('セッションが切れました');
     expect(container.innerHTML).toContain('ページを再読み込みして再度お試しください');
-    const reloadBtn = container.querySelector('#reload-btn');
+    const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
     expect(reloadBtn).toBeInTheDocument();
     // 汎用エラーメッセージは表示されない
     expect(container.innerHTML).not.toContain('同意状況の確認中にエラーが発生しました');
+    // 再読み込みボタンをクリックすると window.location.reload() が呼ばれる
+    reloadBtn.click();
+    expect(window.location.reload).toHaveBeenCalled();
   });
 });
