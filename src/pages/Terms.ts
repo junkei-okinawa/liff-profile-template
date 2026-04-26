@@ -18,7 +18,9 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
 
     try {
         // 1. Fetch and render Markdown immediately
-        const response = await fetch('/terms.md');
+        // cache: 'no-store' を指定して LINE WebView 等のブラウザキャッシュを回避する。
+        // nginx 側でも Cache-Control: no-store を設定しているが、二重に保護する。
+        const response = await fetch('/terms.md', { cache: 'no-store' });
         if (!response.ok) {
             throw new Error('規約の読み込みに失敗しました');
         }
