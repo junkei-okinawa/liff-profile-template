@@ -43,6 +43,12 @@ describe('Terms Page', () => {
     // Suppress console.error for expected errors
     vi.spyOn(console, 'error').mockImplementation(() => { });
 
+    // Mock window.location.reload (same pattern as Profile.test.ts / Unsubscribe.test.ts)
+    Object.defineProperty(window, 'location', {
+      value: { reload: vi.fn() },
+      writable: true,
+    });
+
     // Setup environment variables
     (window as any)._env_ = {
       VITE_API_BASE_URL: mockApiBaseUrl
@@ -273,5 +279,32 @@ describe('Terms Page', () => {
 
     // Should show error in agreement section
     expect(container.innerHTML).toContain('同意状況の確認中にエラーが発生しました');
+  });
+
+  it('shows session expired message with reload button when status API returns 401', async () => {
+    // status API が 401 を返した場合（LINE ID トークン期限切れ）、
+    // 汎用エラーではなく「セッションが切れました」メッセージと再読み込みボタンが表示される。
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+    await renderTerms(container);
+
+    expect(container.innerHTML).toContain('セッションが切れました');
+    expect(container.innerHTML).toContain('ページを再読み込みして再度お試しください');
+    const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
+    expect(reloadBtn).toBeInTheDocument();
+    // 汎用エラーメッセージは表示されない
+    expect(container.innerHTML).not.toContain('同意状況の確認中にエラーが発生しました');
+    // 再読み込みボタンをクリックすると window.location.reload() が呼ばれる
+    reloadBtn.click();
+    expect(window.location.reload).toHaveBeenCalled();
   });
 });

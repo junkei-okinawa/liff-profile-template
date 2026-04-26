@@ -112,6 +112,27 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                 'Authorization': authorizationHeader
             }
         });
+        if (statusResponse.status === 401) {
+            // ID トークンが期限切れの場合、LINE アプリを再起動またはページを再読み込みすると
+            // liff.init() が再実行されて新しいトークンが取得される。
+            const agreementSection = container.querySelector('#agreement-section');
+            if (agreementSection) {
+                agreementSection.innerHTML = `
+                    <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
+                    <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">ページを再読み込みして再度お試しください。</p>
+                    <button id="reload-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
+                        再読み込み
+                    </button>
+                `;
+                const reloadBtn = agreementSection.querySelector('#reload-btn');
+                if (reloadBtn) {
+                    reloadBtn.addEventListener('click', () => {
+                        window.location.reload();
+                    });
+                }
+            }
+            return;
+        }
         if (!statusResponse.ok) {
             throw new Error(`Failed to fetch user status: ${statusResponse.statusText} (Status: ${statusResponse.status})`);
         }
