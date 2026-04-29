@@ -29,8 +29,9 @@ describe('shared-constants', () => {
       expect(TERMS_UPDATED_AT).toBe('2025-06-01T00:00:00.000Z');
     });
 
-    it('should use import.meta.env.VITE_TERMS_UPDATED_AT as fallback when window._env_ is not set', async () => {
-      // ビルド時環境変数（import.meta.env）はランタイムの次のフォールバック
+    it('should use build-time env (import.meta.env / process.env) as fallback when window._env_ has no matching key', async () => {
+      // window._env_ にキーが無い場合、ビルド時環境変数（import.meta.env / process.env）へフォールバックする。
+      // vi.stubEnv は import.meta.env と process.env の両方に値を設定する。
       vi.stubEnv('VITE_TERMS_UPDATED_AT', '2025-12-31T00:00:00.000Z');
       vi.resetModules();
       const { TERMS_UPDATED_AT } = await import('./shared-constants');
