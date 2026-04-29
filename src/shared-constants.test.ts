@@ -12,7 +12,10 @@ describe('shared-constants', () => {
 
   describe('TERMS_UPDATED_AT', () => {
     it('should use DEFAULT_TERMS_UPDATED_AT when VITE_TERMS_UPDATED_AT is not set', async () => {
-      // window._env_ は空、import.meta.env にも未設定 → デフォルト値を返す
+      // window._env_ は空。さらに process.env / import.meta.env に値が入っていても
+      // テストが環境依存にならないよう、空文字を明示的に stub する。
+      // getEnv 側が .trim() で空文字を未設定扱いにし、デフォルト値へフォールバックする前提。
+      vi.stubEnv('VITE_TERMS_UPDATED_AT', '');
       vi.resetModules();
       const { TERMS_UPDATED_AT } = await import('./shared-constants');
       expect(TERMS_UPDATED_AT).toBe('2026-01-01T00:00:00.000Z');
