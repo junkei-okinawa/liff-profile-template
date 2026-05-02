@@ -205,7 +205,12 @@ describe('Terms Page', () => {
     // セッション切れ UI に切り替わる
     expect(container.innerHTML).toContain('セッションが切れました');
     expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
-    expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+    // ページ上部に sticky バナーが表示される
+    const topBanner = container.querySelector('#session-expired-top-banner') as HTMLElement;
+    expect(topBanner).toBeInTheDocument();
+    expect(topBanner).toHaveAttribute('role', 'alert');
+    // 上部・下部両方にログアウトボタンがある
+    expect(container.querySelector('#session-logout-btn-top')).toBeInTheDocument();
     expect(container.querySelector('#session-logout-btn')).toBeInTheDocument();
     // 「プロフィールに戻る」ボタンが非表示になる
     const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
@@ -343,8 +348,17 @@ describe('Terms Page', () => {
     expect(container.innerHTML).toContain('セッションが切れました');
     expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
     expect(container.innerHTML).toContain('再ログインしてください');
-    // スクリーンリーダー向け role="alert" が付与されている
-    expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+    // ページ上部に sticky バナーが表示される
+    const topBanner = container.querySelector('#session-expired-top-banner') as HTMLElement;
+    expect(topBanner).toBeInTheDocument();
+    // スクリーンリーダー向け role="alert" は上部バナーに付与されている
+    expect(topBanner).toHaveAttribute('role', 'alert');
+    expect(topBanner).toHaveAttribute('aria-live', 'assertive');
+    // 上部バナーにログアウトボタンがある
+    const topLogoutBtn = container.querySelector('#session-logout-btn-top') as HTMLButtonElement;
+    expect(topLogoutBtn).toBeInTheDocument();
+    expect(topLogoutBtn).toHaveTextContent('今すぐログアウト');
+    // 下部にもログアウトボタンがある
     const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
     expect(logoutBtn).toBeInTheDocument();
     expect(logoutBtn).toHaveTextContent('今すぐログアウト');
@@ -353,7 +367,7 @@ describe('Terms Page', () => {
     // 401 時は「プロフィールに戻る」ボタンが非表示になる
     const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
     expect(backBtn).not.toBeVisible();
-    // ログアウトボタンをクリックするとログアウトしてルートへ遷移する
+    // 下部ログアウトボタンをクリックするとログアウトしてルートへ遷移する
     (liff.isLoggedIn as any).mockReturnValue(true);
     logoutBtn.click();
     expect(liff.logout).toHaveBeenCalled();
@@ -459,6 +473,55 @@ describe('Terms Page', () => {
     vi.advanceTimersByTime(3000);
     expect(liff.logout).not.toHaveBeenCalled();
     expect(window.location.href).toBe('');
+  });
+
+  it('401: top banner logout button cancels timer and navigates to root', async () => {
+    // 上部バナーのログアウトボタンでもタイマーキャンセル＆ルート遷移が正しく動作することを確認
+    vi.useFakeTimers();
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderTerms(container);
+
+    const topLogoutBtn = container.querySelector('#session-logout-btn-top') as HTMLButtonElement;
+    expect(topLogoutBtn).toBeInTheDocument();
+    topLogoutBtn.click();
+
+    expect(liff.logout).toHaveBeenCalledTimes(1);
+    expect(window.location.href).toBe('/');
+
+    // タイマーが経過しても logout が重複して呼ばれない
+    vi.advanceTimersByTime(3000);
+    expect(liff.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('401: top session expired banner is NOT shown in normal (non-401) render', async () => {
+    // 通常表示（セッション切れなし）ではページ上部にバナーが表示されないことを確認
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ termsAcceptedAt: null }),
+      });
+
+    await renderTerms(container);
+
+    expect(container.querySelector('#session-expired-top-banner')).not.toBeInTheDocument();
+    expect(container.querySelector('#session-logout-btn-top')).not.toBeInTheDocument();
+    // 通常の同意ボタンは表示される
+    expect(container.querySelector('#agree-btn')).toBeInTheDocument();
   });
 
   it('back button navigates to profile page via replaceState', async () => {

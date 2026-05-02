@@ -80,7 +80,8 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
 };
 
 // GET /status・POST /agreement 両方の 401 で使う共通 UI 表示関数。
-// - role="alert" aria-live="assertive" でスクリーンリーダーに即時通知
+// - ページ最上部に sticky バナーを追加し、スクロール位置に関わらずセッション切れを即座に通知
+// - role="alert" aria-live="assertive" は上部バナーのみ付与し、スクリーンリーダーへの重複通知を避ける
 // - 「プロフィールに戻る」ボタンを非表示にして期限切れセッションのまま遷移を防ぐ
 // - 3秒後に自動ログアウト（module スコープタイマーで cleanup 可能）
 const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: HTMLElement): void => {
@@ -90,14 +91,33 @@ const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: H
         backBtn.style.display = 'none';
     }
 
-    agreementSection.innerHTML = `
-        <div role="alert" aria-live="assertive">
-            <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
-            <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-            <button id="session-logout-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
+    // ページ最上部に sticky バナーを prepend する。
+    // 利用規約は長いため、スクロール前でも確実にセッション切れを認識できるようにする。
+    // role="alert" aria-live="assertive" はここ一箇所だけ付与し、スクリーンリーダーへの重複通知を避ける。
+    const termsContainer = container.querySelector('.terms-container');
+    if (termsContainer) {
+        const topBanner = document.createElement('div');
+        topBanner.id = 'session-expired-top-banner';
+        topBanner.setAttribute('role', 'alert');
+        topBanner.setAttribute('aria-live', 'assertive');
+        topBanner.style.cssText = 'position: sticky; top: 0; background: #fff3e0; border-bottom: 2px solid #e65c00; padding: 12px 16px; text-align: center; z-index: 100;';
+        topBanner.innerHTML = `
+            <p style="color: #e65c00; font-weight: bold; margin: 0 0 6px;">セッションが切れました。</p>
+            <p style="color: #666; font-size: 0.9rem; margin: 0 0 10px;">3秒後に自動ログアウトします。再ログインしてください。</p>
+            <button id="session-logout-btn-top" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
                 今すぐログアウト
             </button>
-        </div>
+        `;
+        termsContainer.prepend(topBanner);
+    }
+
+    // 最下部の同意エリアも同じメッセージで更新し、下まで読んだユーザーにも通知する
+    agreementSection.innerHTML = `
+        <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
+        <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">3秒後に自動ログアウトします。再ログインしてください。</p>
+        <button id="session-logout-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
+            今すぐログアウト
+        </button>
     `;
 
     const doLogout = () => {
@@ -113,6 +133,16 @@ const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: H
         doLogout();
     }, 3000);
 
+    // 上部バナーのボタン
+    const sessionLogoutBtnTop = container.querySelector('#session-logout-btn-top');
+    if (sessionLogoutBtnTop) {
+        sessionLogoutBtnTop.addEventListener('click', () => {
+            cleanupTermsAutoLogoutTimer();
+            doLogout();
+        });
+    }
+
+    // 下部ボタン
     const sessionLogoutBtn = agreementSection.querySelector('#session-logout-btn');
     if (sessionLogoutBtn) {
         sessionLogoutBtn.addEventListener('click', () => {
