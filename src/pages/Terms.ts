@@ -135,7 +135,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                 agreementSection.innerHTML = `
                     <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
                     <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-                    <button id="reload-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
+                    <button id="session-logout-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
                         今すぐログアウト
                     </button>
                 `;
@@ -152,9 +152,9 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                     doLogout();
                 }, 3000);
 
-                const reloadBtn = agreementSection.querySelector('#reload-btn');
-                if (reloadBtn) {
-                    reloadBtn.addEventListener('click', () => {
+                const sessionLogoutBtn = agreementSection.querySelector('#session-logout-btn');
+                if (sessionLogoutBtn) {
+                    sessionLogoutBtn.addEventListener('click', () => {
                         cleanupTermsAutoLogoutTimer();
                         doLogout();
                     });

@@ -305,7 +305,7 @@ describe('Terms Page', () => {
     expect(container.innerHTML).toContain('セッションが切れました');
     expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
     expect(container.innerHTML).toContain('再ログインしてください');
-    const logoutBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
+    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
     expect(logoutBtn).toBeInTheDocument();
     expect(logoutBtn).toHaveTextContent('今すぐログアウト');
     // 汎用エラーメッセージは表示されない
@@ -357,7 +357,7 @@ describe('Terms Page', () => {
 
     await renderTerms(container);
 
-    const logoutBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
+    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
     logoutBtn.click();
 
     expect(liff.logout).toHaveBeenCalledTimes(1);
@@ -366,6 +366,56 @@ describe('Terms Page', () => {
     // タイマーが経過しても logout が重複して呼ばれない
     vi.advanceTimersByTime(3000);
     expect(liff.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('401: logout button navigates to root even when not logged in', async () => {
+    // isLoggedIn() === false でも href='/' への遷移は実行されることを確認
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(false);
+
+    await renderTerms(container);
+
+    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+    logoutBtn.click();
+
+    expect(liff.logout).not.toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
+  });
+
+  it('401: cleanupTermsAutoLogoutTimer cancels timer before page navigation', async () => {
+    // ページ遷移時に router が cleanup を呼ぶことでタイマーが止まり、
+    // 別ページ描画後に logout が発火しないことを確認する回帰テスト
+    vi.useFakeTimers();
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderTerms(container);
+
+    // router によるページ遷移を模擬: cleanup を呼ぶ
+    cleanupTermsAutoLogoutTimer();
+
+    // 3秒経過しても logout は発火しない
+    vi.advanceTimersByTime(3000);
+    expect(liff.logout).not.toHaveBeenCalled();
+    expect(window.location.href).toBe('');
   });
 
   it('back button navigates to profile page via replaceState', async () => {
