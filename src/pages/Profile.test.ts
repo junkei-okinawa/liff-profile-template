@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderProfile } from '../pages/Profile';
+import { renderProfile, cleanupProfileAutoLogoutTimer } from '../pages/Profile';
 import liff from '@line/liff';
 
 // Mock @line/liff
@@ -54,6 +54,9 @@ describe('Profile Page', () => {
   });
 
   afterEach(() => {
+    // fake timers を使ったテストで assertion 失敗時も確実に復元する
+    vi.useRealTimers();
+    cleanupProfileAutoLogoutTimer();
     document.body.removeChild(container);
     (window as any)._env_ = {};
   });
@@ -147,17 +150,6 @@ describe('Profile Page', () => {
     expect(container.innerHTML).toContain('プロフィールの読み込みに失敗しました');
   });
 
-  it('reload button navigates to root (/)', async () => {
-    await renderProfile(container);
-
-    const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
-    expect(reloadBtn).toBeInTheDocument();
-
-    reloadBtn.click();
-
-    expect(window.location.href).toBe('/');
-  });
-
   it('shows error when getProfile fails', async () => {
     (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
 
@@ -166,17 +158,18 @@ describe('Profile Page', () => {
     expect(container.innerHTML).toContain('プロフィールの読み込みに失敗しました');
   });
 
-  it('error state: reload button navigates to root (/)', async () => {
+  it('error state: shows auto-logout message and logout button', async () => {
     (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
 
     await renderProfile(container);
 
-    const reloadBtn = container.querySelector('#error-reload-btn') as HTMLButtonElement;
-    expect(reloadBtn).toBeInTheDocument();
-
-    reloadBtn.click();
-
-    expect(window.location.href).toBe('/');
+    expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
+    expect(container.innerHTML).toContain('再ログインしてください');
+    const logoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
+    expect(logoutBtn).toBeInTheDocument();
+    expect(logoutBtn).toHaveTextContent('今すぐログアウト');
+    // 再読み込みボタンは存在しない
+    expect(container.querySelector('#error-reload-btn')).not.toBeInTheDocument();
   });
 
   it('error state: logout button calls logout then navigates to root when logged in', async () => {
@@ -207,5 +200,38 @@ describe('Profile Page', () => {
 
     expect(liff.logout).not.toHaveBeenCalled();
     expect(window.location.href).toBe('/');
+  });
+
+  it('error state: auto-logout fires after 3 seconds when button not clicked', async () => {
+    vi.useFakeTimers();
+    (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderProfile(container);
+
+    expect(window.location.href).toBe('');
+
+    vi.advanceTimersByTime(3000);
+
+    expect(liff.logout).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
+  });
+
+  it('error state: clicking logout button cancels auto-logout timer', async () => {
+    vi.useFakeTimers();
+    (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderProfile(container);
+
+    const logoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
+    logoutBtn.click();
+
+    expect(liff.logout).toHaveBeenCalledTimes(1);
+    expect(window.location.href).toBe('/');
+
+    // タイマーが経過しても logout が重複して呼ばれない
+    vi.advanceTimersByTime(3000);
+    expect(liff.logout).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,6 +7,18 @@ interface Profile {
   userId?: string;
 }
 
+// module スコープで自動ログアウトタイマーIDを保持する。
+// ページ遷移時にルーターから cleanupProfileAutoLogoutTimer() を呼ぶことで
+// 別ページ描画後にタイマーが発火してしまう問題を防ぐ。
+let _autoLogoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const cleanupProfileAutoLogoutTimer = (): void => {
+  if (_autoLogoutTimer !== null) {
+    clearTimeout(_autoLogoutTimer);
+    _autoLogoutTimer = null;
+  }
+};
+
 // Utility function to escape HTML to prevent XSS
 const escapeHtml = (unsafe: string): string => {
   return unsafe
@@ -75,7 +87,6 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
         <span style="margin: 0 10px; color: #ccc;">|</span>
         <a href="/unsubscribe" style="color: #666; text-decoration: none; font-size: 0.9rem;">退会する</a>
         <br><br>
-        <button id="reload-btn" style="padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-right: 8px;">再読み込み</button>
         <button id="logout-btn" style="padding: 8px 16px; background: #ff4d4f; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">ログアウト</button>
       </div>
     `;
@@ -100,13 +111,6 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
       };
     }
 
-    const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
-    if (reloadBtn) {
-      reloadBtn.onclick = () => {
-        window.location.href = '/';
-      };
-    }
-
     const logoutBtn = container.querySelector('#logout-btn') as HTMLButtonElement;
     if (logoutBtn) {
       logoutBtn.onclick = () => {
@@ -122,22 +126,32 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
     container.innerHTML = `
       <div class="container">
         <p style="color:red">プロフィールの読み込みに失敗しました。</p>
+        <p style="color:#666; font-size:0.9rem;">3秒後に自動ログアウトします。再ログインしてください。</p>
         <div style="text-align:center; margin-top: 16px;">
-          <button id="error-reload-btn" style="padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-right: 8px;">再読み込み</button>
-          <button id="error-logout-btn" style="padding: 8px 16px; background: #ff4d4f; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">ログアウト</button>
+          <button id="error-logout-btn" style="padding: 8px 16px; background: #ff4d4f; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">今すぐログアウト</button>
         </div>
       </div>`;
-    const errorReloadBtn = container.querySelector('#error-reload-btn') as HTMLButtonElement;
-    if (errorReloadBtn) {
-      errorReloadBtn.onclick = () => { window.location.href = '/'; };
-    }
+
+    const doLogout = () => {
+      if (liff.isLoggedIn()) {
+        liff.logout();
+      }
+      window.location.href = '/';
+    };
+
+    // 3秒後に自動ログアウト。ボタン押下時はタイマーをキャンセルして即実行。
+    // module スコープの _autoLogoutTimer に保持することで、
+    // ページ遷移時に cleanupProfileAutoLogoutTimer() でキャンセル可能にする。
+    _autoLogoutTimer = setTimeout(() => {
+      _autoLogoutTimer = null;
+      doLogout();
+    }, 3000);
+
     const errorLogoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
     if (errorLogoutBtn) {
       errorLogoutBtn.onclick = () => {
-        if (liff.isLoggedIn()) {
-          liff.logout();
-        }
-        window.location.href = '/';
+        cleanupProfileAutoLogoutTimer();
+        doLogout();
       };
     }
   }
