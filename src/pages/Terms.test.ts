@@ -43,11 +43,12 @@ describe('Terms Page', () => {
     // Suppress console.error for expected errors
     vi.spyOn(console, 'error').mockImplementation(() => { });
 
-    // Mock window.location.reload (same pattern as Profile.test.ts / Unsubscribe.test.ts)
+    // Mock window.location (Profile.test.ts と同様。Unsubscribe.test.ts は reload のみ)
     Object.defineProperty(window, 'location', {
-      value: { reload: vi.fn() },
+      value: { reload: vi.fn(), href: '' },
       writable: true,
     });
+    window.location.href = '';
 
     // Setup environment variables
     (window as any)._env_ = {
@@ -303,8 +304,32 @@ describe('Terms Page', () => {
     expect(reloadBtn).toBeInTheDocument();
     // 汎用エラーメッセージは表示されない
     expect(container.innerHTML).not.toContain('同意状況の確認中にエラーが発生しました');
-    // 再読み込みボタンをクリックすると window.location.reload() が呼ばれる
+    // 再読み込みボタンをクリックするとルートへ遷移する
     reloadBtn.click();
-    expect(window.location.reload).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
+  });
+
+  it('back button navigates to profile page via replaceState', async () => {
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ termsAcceptedAt: new Date().toISOString() }),
+      });
+
+    await renderTerms(container);
+
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+    const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+
+    const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
+    expect(backBtn).toBeInTheDocument();
+    backBtn.click();
+
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/profile/me');
+    expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(Event));
   });
 });

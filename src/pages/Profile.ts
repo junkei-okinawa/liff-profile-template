@@ -103,7 +103,7 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
     const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
     if (reloadBtn) {
       reloadBtn.onclick = () => {
-        window.location.reload();
+        window.location.href = '/';
       };
     }
 
@@ -112,7 +112,7 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
       logoutBtn.onclick = () => {
         if (liff.isLoggedIn()) {
           liff.logout();
-          window.location.reload();
+          window.location.href = '/';
         }
       };
     }
@@ -129,7 +129,7 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
       </div>`;
     const errorReloadBtn = container.querySelector('#error-reload-btn') as HTMLButtonElement;
     if (errorReloadBtn) {
-      errorReloadBtn.onclick = () => { window.location.reload(); };
+      errorReloadBtn.onclick = () => { window.location.href = '/'; };
     }
     const errorLogoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
     if (errorLogoutBtn) {
@@ -137,7 +137,7 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
         if (liff.isLoggedIn()) {
           liff.logout();
         }
-        window.location.reload();
+        window.location.href = '/';
       };
     }
   }

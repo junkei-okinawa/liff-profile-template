@@ -42,9 +42,10 @@ describe('Profile Page', () => {
 
     // Mock window methods
     Object.defineProperty(window, 'location', {
-      value: { reload: vi.fn() },
+      value: { reload: vi.fn(), href: '' },
       writable: true
     });
+    window.location.href = '';
 
     // Setup window._env_ for runtime config
     (window as any)._env_ = {
@@ -115,7 +116,7 @@ describe('Profile Page', () => {
     logoutBtn.click();
 
     expect(liff.logout).toHaveBeenCalled();
-    expect(window.location.reload).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
   });
 
   it('handles navigation links', async () => {
@@ -146,7 +147,7 @@ describe('Profile Page', () => {
     expect(container.innerHTML).toContain('プロフィールの読み込みに失敗しました');
   });
 
-  it('reload button triggers window.location.reload', async () => {
+  it('reload button navigates to root (/)', async () => {
     await renderProfile(container);
 
     const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
@@ -154,7 +155,7 @@ describe('Profile Page', () => {
 
     reloadBtn.click();
 
-    expect(window.location.reload).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
   });
 
   it('shows error when getProfile fails', async () => {
@@ -165,7 +166,7 @@ describe('Profile Page', () => {
     expect(container.innerHTML).toContain('プロフィールの読み込みに失敗しました');
   });
 
-  it('error state: reload button triggers window.location.reload', async () => {
+  it('error state: reload button navigates to root (/)', async () => {
     (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
 
     await renderProfile(container);
@@ -175,10 +176,10 @@ describe('Profile Page', () => {
 
     reloadBtn.click();
 
-    expect(window.location.reload).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
   });
 
-  it('error state: logout button calls logout then reload when logged in', async () => {
+  it('error state: logout button calls logout then navigates to root when logged in', async () => {
     (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
     (liff.isLoggedIn as any).mockReturnValue(true);
 
@@ -190,10 +191,10 @@ describe('Profile Page', () => {
     logoutBtn.click();
 
     expect(liff.logout).toHaveBeenCalled();
-    expect(window.location.reload).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
   });
 
-  it('error state: logout button calls reload even when not logged in', async () => {
+  it('error state: logout button navigates to root even when not logged in', async () => {
     (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
     (liff.isLoggedIn as any).mockReturnValue(false);
 
@@ -205,6 +206,6 @@ describe('Profile Page', () => {
     logoutBtn.click();
 
     expect(liff.logout).not.toHaveBeenCalled();
-    expect(window.location.reload).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
   });
 });

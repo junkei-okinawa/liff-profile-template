@@ -51,7 +51,10 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
         const backBtn = document.getElementById('back-btn');
         if (backBtn) {
             backBtn.onclick = () => {
-                window.history.back();
+                // history.back() は BOT URL から直接アクセスした場合に履歴がなく機能しない。
+                // replaceState で Terms を Profile に置き換え、pushState による履歴ループを防ぐ。
+                window.history.replaceState({}, '', '/profile/me');
+                window.dispatchEvent(new Event('popstate'));
             };
         }
 
@@ -127,7 +130,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                 const reloadBtn = agreementSection.querySelector('#reload-btn');
                 if (reloadBtn) {
                     reloadBtn.addEventListener('click', () => {
-                        window.location.reload();
+                        window.location.href = '/';
                     });
                 }
             }
