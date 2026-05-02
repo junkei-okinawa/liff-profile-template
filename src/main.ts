@@ -1,5 +1,5 @@
 import liff from '@line/liff';
-import { renderProfile } from './pages/Profile';
+import { renderProfile, cleanupProfileAutoLogoutTimer } from './pages/Profile';
 import { renderTerms } from './pages/Terms';
 import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer } from './pages/Unsubscribe';
 import { config } from './config';
@@ -10,6 +10,7 @@ const app = document.getElementById('app') as HTMLElement;
 // Router function
 const router = async (): Promise<void> => {
     // Clean up any running timers from previous pages
+    cleanupProfileAutoLogoutTimer();
     cleanupUnsubscribeTimer();
 
     const path = window.location.pathname;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderProfile } from '../pages/Profile';
+import { renderProfile, cleanupProfileAutoLogoutTimer } from '../pages/Profile';
 import liff from '@line/liff';
 
 // Mock @line/liff
@@ -54,6 +54,9 @@ describe('Profile Page', () => {
   });
 
   afterEach(() => {
+    // fake timers を使ったテストで assertion 失敗時も確実に復元する
+    vi.useRealTimers();
+    cleanupProfileAutoLogoutTimer();
     document.body.removeChild(container);
     (window as any)._env_ = {};
   });
@@ -212,8 +215,6 @@ describe('Profile Page', () => {
 
     expect(liff.logout).toHaveBeenCalled();
     expect(window.location.href).toBe('/');
-
-    vi.useRealTimers();
   });
 
   it('error state: clicking logout button cancels auto-logout timer', async () => {
@@ -232,7 +233,5 @@ describe('Profile Page', () => {
     // タイマーが経過しても logout が重複して呼ばれない
     vi.advanceTimersByTime(3000);
     expect(liff.logout).toHaveBeenCalledTimes(1);
-
-    vi.useRealTimers();
   });
 });

@@ -7,6 +7,18 @@ interface Profile {
   userId?: string;
 }
 
+// module スコープで自動ログアウトタイマーIDを保持する。
+// ページ遷移時にルーターから cleanupProfileAutoLogoutTimer() を呼ぶことで
+// 別ページ描画後にタイマーが発火してしまう問題を防ぐ。
+let _autoLogoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const cleanupProfileAutoLogoutTimer = (): void => {
+  if (_autoLogoutTimer !== null) {
+    clearTimeout(_autoLogoutTimer);
+    _autoLogoutTimer = null;
+  }
+};
+
 // Utility function to escape HTML to prevent XSS
 const escapeHtml = (unsafe: string): string => {
   return unsafe
@@ -128,12 +140,17 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
     };
 
     // 3秒後に自動ログアウト。ボタン押下時はタイマーをキャンセルして即実行。
-    const timer = setTimeout(doLogout, 3000);
+    // module スコープの _autoLogoutTimer に保持することで、
+    // ページ遷移時に cleanupProfileAutoLogoutTimer() でキャンセル可能にする。
+    _autoLogoutTimer = setTimeout(() => {
+      _autoLogoutTimer = null;
+      doLogout();
+    }, 3000);
 
     const errorLogoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
     if (errorLogoutBtn) {
       errorLogoutBtn.onclick = () => {
-        clearTimeout(timer);
+        cleanupProfileAutoLogoutTimer();
         doLogout();
       };
     }
