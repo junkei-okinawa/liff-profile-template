@@ -79,6 +79,49 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
     }
 };
 
+// GET /status・POST /agreement 両方の 401 で使う共通 UI 表示関数。
+// - role="alert" aria-live="assertive" でスクリーンリーダーに即時通知
+// - 「プロフィールに戻る」ボタンを非表示にして期限切れセッションのまま遷移を防ぐ
+// - 3秒後に自動ログアウト（module スコープタイマーで cleanup 可能）
+const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: HTMLElement): void => {
+    // 401 時は戻る導線を塞ぎ、期限切れセッションのまま Profile に戻れないようにする
+    const backBtn = container.querySelector('#back-btn') as HTMLButtonElement | null;
+    if (backBtn) {
+        backBtn.style.display = 'none';
+    }
+
+    agreementSection.innerHTML = `
+        <div role="alert" aria-live="assertive">
+            <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">3秒後に自動ログアウトします。再ログインしてください。</p>
+            <button id="session-logout-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
+                今すぐログアウト
+            </button>
+        </div>
+    `;
+
+    const doLogout = () => {
+        if (liff.isLoggedIn()) {
+            liff.logout();
+        }
+        window.location.href = '/';
+    };
+
+    // module スコープのタイマーIDで保持し、ページ遷移時に cleanup 可能にする
+    _autoLogoutTimer = setTimeout(() => {
+        _autoLogoutTimer = null;
+        doLogout();
+    }, 3000);
+
+    const sessionLogoutBtn = agreementSection.querySelector('#session-logout-btn');
+    if (sessionLogoutBtn) {
+        sessionLogoutBtn.addEventListener('click', () => {
+            cleanupTermsAutoLogoutTimer();
+            doLogout();
+        });
+    }
+};
+
 const getAuthToken = (): string => {
     const idToken = liff.getIDToken();
     if (!idToken) {
@@ -128,37 +171,10 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             }
         });
         if (statusResponse.status === 401) {
-            // ID トークンが期限切れ。再読み込みではトークンが更新されないため
-            // Profile と同じパターンで自動ログアウトし、再ログインを促す。
+            // ID トークンが期限切れ。共通関数で自動ログアウト UI を表示する。
             const agreementSection = container.querySelector('#agreement-section');
             if (agreementSection) {
-                agreementSection.innerHTML = `
-                    <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
-                    <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-                    <button id="session-logout-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
-                        今すぐログアウト
-                    </button>
-                `;
-                const doLogout = () => {
-                    if (liff.isLoggedIn()) {
-                        liff.logout();
-                    }
-                    window.location.href = '/';
-                };
-
-                // module スコープのタイマーIDで保持し、ページ遷移時に cleanup 可能にする
-                _autoLogoutTimer = setTimeout(() => {
-                    _autoLogoutTimer = null;
-                    doLogout();
-                }, 3000);
-
-                const sessionLogoutBtn = agreementSection.querySelector('#session-logout-btn');
-                if (sessionLogoutBtn) {
-                    sessionLogoutBtn.addEventListener('click', () => {
-                        cleanupTermsAutoLogoutTimer();
-                        doLogout();
-                    });
-                }
+                showSessionExpiredAndAutoLogout(agreementSection, container);
             }
             return;
         }
@@ -252,6 +268,14 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
             body: JSON.stringify({ agreed: true })
         });
 
+        if (response.status === 401) {
+            // 同意 POST 中にトークンが期限切れになった場合も自動ログアウトへ誘導する
+            const agreementSection = container.querySelector('#agreement-section');
+            if (agreementSection) {
+                showSessionExpiredAndAutoLogout(agreementSection, container);
+            }
+            return;
+        }
         if (!response.ok) {
             throw new Error(`API Error: ${response.status}`);
         }

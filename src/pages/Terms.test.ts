@@ -174,6 +174,44 @@ describe('Terms Page', () => {
     expect(container.innerHTML).toContain('規約に同意済みです');
   });
 
+  it('shows session expired auto-logout when agreement POST returns 401', async () => {
+    // 利用規約を読んでいる間にトークンが切れて POST /agreement が 401 を返すケース
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ termsAcceptedAt: null }),
+      });
+
+    await renderTerms(container);
+
+    const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
+    expect(agreeBtn).toBeInTheDocument();
+
+    // POST /agreement が 401 を返す
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+    });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    agreeBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    // セッション切れ UI に切り替わる
+    expect(container.innerHTML).toContain('セッションが切れました');
+    expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
+    expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+    expect(container.querySelector('#session-logout-btn')).toBeInTheDocument();
+    // 「プロフィールに戻る」ボタンが非表示になる
+    const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
+    expect(backBtn).not.toBeVisible();
+  });
+
   it('shows re-consent button when termsAcceptedAt is older than TERMS_UPDATED_AT', async () => {
     // Mock fetch for terms.md
     (global.fetch as any)
@@ -305,11 +343,16 @@ describe('Terms Page', () => {
     expect(container.innerHTML).toContain('セッションが切れました');
     expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
     expect(container.innerHTML).toContain('再ログインしてください');
+    // スクリーンリーダー向け role="alert" が付与されている
+    expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
     const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
     expect(logoutBtn).toBeInTheDocument();
     expect(logoutBtn).toHaveTextContent('今すぐログアウト');
     // 汎用エラーメッセージは表示されない
     expect(container.innerHTML).not.toContain('同意状況の確認中にエラーが発生しました');
+    // 401 時は「プロフィールに戻る」ボタンが非表示になる
+    const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
+    expect(backBtn).not.toBeVisible();
     // ログアウトボタンをクリックするとログアウトしてルートへ遷移する
     (liff.isLoggedIn as any).mockReturnValue(true);
     logoutBtn.click();
