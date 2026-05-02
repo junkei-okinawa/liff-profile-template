@@ -75,6 +75,7 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
         <span style="margin: 0 10px; color: #ccc;">|</span>
         <a href="/unsubscribe" style="color: #666; text-decoration: none; font-size: 0.9rem;">退会する</a>
         <br><br>
+        <button id="reload-btn" style="padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-right: 8px;">再読み込み</button>
         <button id="logout-btn" style="padding: 8px 16px; background: #ff4d4f; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">ログアウト</button>
       </div>
     `;
@@ -99,6 +100,13 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
       };
     }
 
+    const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
+    if (reloadBtn) {
+      reloadBtn.onclick = () => {
+        window.location.reload();
+      };
+    }
+
     const logoutBtn = container.querySelector('#logout-btn') as HTMLButtonElement;
     if (logoutBtn) {
       logoutBtn.onclick = () => {
@@ -111,6 +119,26 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
 
   } catch (error: unknown) {
     console.error('Profile rendering error:', error);
-    container.innerHTML = `<div class="container"><p style="color:red">プロフィールの読み込みに失敗しました。</p></div>`;
+    container.innerHTML = `
+      <div class="container">
+        <p style="color:red">プロフィールの読み込みに失敗しました。</p>
+        <div style="text-align:center; margin-top: 16px;">
+          <button id="error-reload-btn" style="padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer; margin-right: 8px;">再読み込み</button>
+          <button id="error-logout-btn" style="padding: 8px 16px; background: #ff4d4f; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">ログアウト</button>
+        </div>
+      </div>`;
+    const errorReloadBtn = container.querySelector('#error-reload-btn') as HTMLButtonElement;
+    if (errorReloadBtn) {
+      errorReloadBtn.onclick = () => { window.location.reload(); };
+    }
+    const errorLogoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
+    if (errorLogoutBtn) {
+      errorLogoutBtn.onclick = () => {
+        if (liff.isLoggedIn()) {
+          liff.logout();
+        }
+        window.location.reload();
+      };
+    }
   }
 };

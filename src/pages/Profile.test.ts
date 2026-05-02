@@ -146,11 +146,65 @@ describe('Profile Page', () => {
     expect(container.innerHTML).toContain('プロフィールの読み込みに失敗しました');
   });
 
+  it('reload button triggers window.location.reload', async () => {
+    await renderProfile(container);
+
+    const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
+    expect(reloadBtn).toBeInTheDocument();
+
+    reloadBtn.click();
+
+    expect(window.location.reload).toHaveBeenCalled();
+  });
+
   it('shows error when getProfile fails', async () => {
     (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
 
     await renderProfile(container);
 
     expect(container.innerHTML).toContain('プロフィールの読み込みに失敗しました');
+  });
+
+  it('error state: reload button triggers window.location.reload', async () => {
+    (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
+
+    await renderProfile(container);
+
+    const reloadBtn = container.querySelector('#error-reload-btn') as HTMLButtonElement;
+    expect(reloadBtn).toBeInTheDocument();
+
+    reloadBtn.click();
+
+    expect(window.location.reload).toHaveBeenCalled();
+  });
+
+  it('error state: logout button calls logout then reload when logged in', async () => {
+    (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderProfile(container);
+
+    const logoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
+    expect(logoutBtn).toBeInTheDocument();
+
+    logoutBtn.click();
+
+    expect(liff.logout).toHaveBeenCalled();
+    expect(window.location.reload).toHaveBeenCalled();
+  });
+
+  it('error state: logout button calls reload even when not logged in', async () => {
+    (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
+    (liff.isLoggedIn as any).mockReturnValue(false);
+
+    await renderProfile(container);
+
+    const logoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
+    expect(logoutBtn).toBeInTheDocument();
+
+    logoutBtn.click();
+
+    expect(liff.logout).not.toHaveBeenCalled();
+    expect(window.location.reload).toHaveBeenCalled();
   });
 });
