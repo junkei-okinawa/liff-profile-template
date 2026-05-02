@@ -79,6 +79,16 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
     }
 };
 
+// セッション切れメッセージとログアウトボタンの HTML を生成する純粋関数。
+// 上部バナー・下部エリアで共用し、文言・ボタンスタイルの変更を一箇所に集約する。
+const buildSessionExpiredHtml = (btnId: string): string => `
+    <p style="color: #e65c00; font-weight: bold; margin: 0 0 6px;">セッションが切れました。</p>
+    <p style="color: #666; font-size: 0.9rem; margin: 0 0 10px;">3秒後に自動ログアウトします。再ログインしてください。</p>
+    <button id="${btnId}" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
+        今すぐログアウト
+    </button>
+`;
+
 // GET /status・POST /agreement 両方の 401 で使う共通 UI 表示関数。
 // - ページ最上部に sticky バナーを追加し、スクロール位置に関わらずセッション切れを即座に通知
 // - role="alert" aria-live="assertive" は上部バナーのみ付与し、スクリーンリーダーへの重複通知を避ける
@@ -101,24 +111,12 @@ const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: H
         topBanner.setAttribute('role', 'alert');
         topBanner.setAttribute('aria-live', 'assertive');
         topBanner.style.cssText = 'position: sticky; top: 0; background: #fff3e0; border-bottom: 2px solid #e65c00; padding: 12px 16px; text-align: center; z-index: 100;';
-        topBanner.innerHTML = `
-            <p style="color: #e65c00; font-weight: bold; margin: 0 0 6px;">セッションが切れました。</p>
-            <p style="color: #666; font-size: 0.9rem; margin: 0 0 10px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-            <button id="session-logout-btn-top" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
-                今すぐログアウト
-            </button>
-        `;
+        topBanner.innerHTML = buildSessionExpiredHtml('session-logout-btn-top');
         termsContainer.prepend(topBanner);
     }
 
     // 最下部の同意エリアも同じメッセージで更新し、下まで読んだユーザーにも通知する
-    agreementSection.innerHTML = `
-        <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
-        <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-        <button id="session-logout-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
-            今すぐログアウト
-        </button>
-    `;
+    agreementSection.innerHTML = buildSessionExpiredHtml('session-logout-btn');
 
     const doLogout = () => {
         if (liff.isLoggedIn()) {
