@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderTerms } from '../pages/Terms';
+import { renderTerms, cleanupTermsAutoLogoutTimer } from '../pages/Terms';
 import { TERMS_UPDATED_AT } from '../shared-constants';
 import liff from '@line/liff';
 
@@ -11,6 +11,7 @@ vi.mock('@line/liff', () => ({
     getContext: vi.fn(),
     getProfile: vi.fn(),
     getIDToken: vi.fn(),
+    logout: vi.fn(),
   },
 }));
 
@@ -66,6 +67,9 @@ describe('Terms Page', () => {
   });
 
   afterEach(() => {
+    // fake timers を使ったテストで assertion 失敗時も確実に復元する
+    vi.useRealTimers();
+    cleanupTermsAutoLogoutTimer();
     document.body.removeChild(container);
     (window as any)._env_ = {};
   });
@@ -168,6 +172,44 @@ describe('Terms Page', () => {
 
     // Check if UI updated
     expect(container.innerHTML).toContain('規約に同意済みです');
+  });
+
+  it('shows session expired auto-logout when agreement POST returns 401', async () => {
+    // 利用規約を読んでいる間にトークンが切れて POST /agreement が 401 を返すケース
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ termsAcceptedAt: null }),
+      });
+
+    await renderTerms(container);
+
+    const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
+    expect(agreeBtn).toBeInTheDocument();
+
+    // POST /agreement が 401 を返す
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+    });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    agreeBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    // セッション切れ UI に切り替わる
+    expect(container.innerHTML).toContain('セッションが切れました');
+    expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
+    expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+    expect(container.querySelector('#session-logout-btn')).toBeInTheDocument();
+    // 「プロフィールに戻る」ボタンが非表示になる
+    const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
+    expect(backBtn).not.toBeVisible();
   });
 
   it('shows re-consent button when termsAcceptedAt is older than TERMS_UPDATED_AT', async () => {
@@ -282,9 +324,9 @@ describe('Terms Page', () => {
     expect(container.innerHTML).toContain('同意状況の確認中にエラーが発生しました');
   });
 
-  it('shows session expired message with reload button when status API returns 401', async () => {
+  it('shows session expired message with auto-logout when status API returns 401', async () => {
     // status API が 401 を返した場合（LINE ID トークン期限切れ）、
-    // 汎用エラーではなく「セッションが切れました」メッセージと再読み込みボタンが表示される。
+    // 再読み込みではトークンが更新されないため自動ログアウトで対応する。
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
@@ -299,14 +341,124 @@ describe('Terms Page', () => {
     await renderTerms(container);
 
     expect(container.innerHTML).toContain('セッションが切れました');
-    expect(container.innerHTML).toContain('ページを再読み込みして再度お試しください');
-    const reloadBtn = container.querySelector('#reload-btn') as HTMLButtonElement;
-    expect(reloadBtn).toBeInTheDocument();
+    expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
+    expect(container.innerHTML).toContain('再ログインしてください');
+    // スクリーンリーダー向け role="alert" が付与されている
+    expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+    expect(logoutBtn).toBeInTheDocument();
+    expect(logoutBtn).toHaveTextContent('今すぐログアウト');
     // 汎用エラーメッセージは表示されない
     expect(container.innerHTML).not.toContain('同意状況の確認中にエラーが発生しました');
-    // 再読み込みボタンをクリックするとルートへ遷移する
-    reloadBtn.click();
+    // 401 時は「プロフィールに戻る」ボタンが非表示になる
+    const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
+    expect(backBtn).not.toBeVisible();
+    // ログアウトボタンをクリックするとログアウトしてルートへ遷移する
+    (liff.isLoggedIn as any).mockReturnValue(true);
+    logoutBtn.click();
+    expect(liff.logout).toHaveBeenCalled();
     expect(window.location.href).toBe('/');
+  });
+
+  it('401: auto-logout fires after 3 seconds when button not clicked', async () => {
+    vi.useFakeTimers();
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderTerms(container);
+
+    expect(window.location.href).toBe('');
+
+    vi.advanceTimersByTime(3000);
+
+    expect(liff.logout).toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
+  });
+
+  it('401: clicking logout button cancels auto-logout timer', async () => {
+    vi.useFakeTimers();
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderTerms(container);
+
+    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+    logoutBtn.click();
+
+    expect(liff.logout).toHaveBeenCalledTimes(1);
+    expect(window.location.href).toBe('/');
+
+    // タイマーが経過しても logout が重複して呼ばれない
+    vi.advanceTimersByTime(3000);
+    expect(liff.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('401: logout button navigates to root even when not logged in', async () => {
+    // isLoggedIn() === false でも href='/' への遷移は実行されることを確認
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(false);
+
+    await renderTerms(container);
+
+    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+    logoutBtn.click();
+
+    expect(liff.logout).not.toHaveBeenCalled();
+    expect(window.location.href).toBe('/');
+  });
+
+  it('401: cleanupTermsAutoLogoutTimer cancels timer before page navigation', async () => {
+    // ページ遷移時に router が cleanup を呼ぶことでタイマーが止まり、
+    // 別ページ描画後に logout が発火しないことを確認する回帰テスト
+    vi.useFakeTimers();
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderTerms(container);
+
+    // router によるページ遷移を模擬: cleanup を呼ぶ
+    cleanupTermsAutoLogoutTimer();
+
+    // 3秒経過しても logout は発火しない
+    vi.advanceTimersByTime(3000);
+    expect(liff.logout).not.toHaveBeenCalled();
+    expect(window.location.href).toBe('');
   });
 
   it('back button navigates to profile page via replaceState', async () => {
