@@ -133,7 +133,12 @@ export const renderProfile = async (container: HTMLElement): Promise<void> => {
     }
     const errorLogoutBtn = container.querySelector('#error-logout-btn') as HTMLButtonElement;
     if (errorLogoutBtn) {
-      errorLogoutBtn.onclick = () => { liff.logout(); window.location.reload(); };
+      errorLogoutBtn.onclick = () => {
+        if (liff.isLoggedIn()) {
+          liff.logout();
+        }
+        window.location.reload();
+      };
     }
   }
 };
