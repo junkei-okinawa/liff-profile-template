@@ -145,11 +145,11 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       };
     }
 
-    // 退会に必要な userId と idToken を取得する。
-    // idToken が null（セッション切れ）の場合は自動ログアウト UI を表示して終了する。
-    let userId = '';
+    // セッション確認: idToken の有効性と userId の取得可能性を検証する。
+    // userId は退会 API 実装時にボタンハンドラ内で改めて取得するため、ここでは保存しない。
+    // （noUnusedLocals: true のため、実際に使うタイミングまで変数化しない。）
     try {
-      ({ userId } = await getUserIdAndToken());
+      await getUserIdAndToken();
     } catch (e: unknown) {
       const isSessionExpired = e instanceof Error && e.message === 'SESSION_EXPIRED';
       if (isSessionExpired) {
@@ -176,7 +176,9 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
           return;
         }
 
-        // TODO: 退会API を呼び出す（userId・currentIdToken を使用）
+        // TODO: 退会API を呼び出す
+        // userId と currentIdToken は getUserIdAndToken() を再度呼び出して取得する。
+        // const { userId } = await getUserIdAndToken();
         // const apiBaseUrl = config.apiBaseUrl;
         // const response = await fetch(`${apiBaseUrl}/api/users/${userId}`, {
         //   method: 'DELETE',

@@ -195,6 +195,26 @@ describe('Unsubscribe Page', () => {
       expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
     });
 
+    it('shows user info error when both context and getProfile return empty userId', async () => {
+      // getContext().userId も getProfile().userId も空の場合、
+      // 「無効なユーザーID」エラーを経てユーザー情報取得失敗メッセージを表示する。
+      // この防御バリデーションが将来削除された場合にテストで検知できるよう押さえる。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockResolvedValue({ userId: '' });
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      expect(container.innerHTML).toContain('ユーザー情報の取得に失敗しました');
+      // セッション切れ UI は表示されない
+      expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
+      // 退会ボタンは表示されない
+      expect(container.querySelector('#unsubscribe-btn')).not.toBeInTheDocument();
+    });
+
     it('shows session expired when isLoggedIn and isInClient are both false (SPA navigation after session expiry)', async () => {
       // SPA 遷移では initLiff() が再実行されないため、
       // isLoggedIn()/isInClient() が false のまま /unsubscribe に遷移するケースがある。
