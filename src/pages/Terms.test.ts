@@ -524,6 +524,36 @@ describe('Terms Page', () => {
     expect(container.querySelector('#agree-btn')).toBeInTheDocument();
   });
 
+  it('401: doLogout is not called twice when timer fires and top/bottom buttons clicked simultaneously', async () => {
+    // Terms には上部・下部の 2 ボタンがあるため、タイマー満了＋ボタン連打でも
+    // liff.logout() が二重実行されないことを確認する
+    vi.useFakeTimers();
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderTerms(container);
+
+    // タイマー満了 → doLogout() 1回目
+    vi.advanceTimersByTime(3000);
+    expect(liff.logout).toHaveBeenCalledTimes(1);
+
+    // 上部ボタン・下部ボタン連打 → hasLoggedOut ガードで skip
+    const topBtn = container.querySelector('#session-logout-btn-top') as HTMLButtonElement;
+    const bottomBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+    topBtn.click();
+    bottomBtn.click();
+    expect(liff.logout).toHaveBeenCalledTimes(1); // 重複しない
+  });
+
   it('back button navigates to profile page via replaceState', async () => {
     (global.fetch as any)
       .mockResolvedValueOnce({

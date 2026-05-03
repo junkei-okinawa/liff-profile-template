@@ -85,6 +85,7 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
 // - role="alert" aria-live="assertive" は上部バナーのみ付与し、スクリーンリーダーへの重複通知を避ける
 // - 「プロフィールに戻る」ボタンを非表示にして期限切れセッションのまま遷移を防ぐ
 // - 3秒後に自動ログアウト（module スコープタイマーで cleanup 可能）
+// - hasLoggedOut ガードでタイマー満了・上部ボタン・下部ボタンの同時実行による二重実行を防止
 const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: HTMLElement): void => {
     // 401 時は戻る導線を塞ぎ、期限切れセッションのまま Profile に戻れないようにする
     const backBtn = container.querySelector('#back-btn') as HTMLButtonElement | null;
@@ -109,7 +110,12 @@ const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: H
     // 最下部の同意エリアも同じメッセージで更新し、下まで読んだユーザーにも通知する
     agreementSection.innerHTML = buildSessionExpiredHtml('session-logout-btn');
 
+    // タイマー満了・上部ボタン・下部ボタンが重なっても liff.logout() と
+    // href='/' が二重実行されないよう hasLoggedOut フラグでガードする。
+    let hasLoggedOut = false;
     const doLogout = () => {
+        if (hasLoggedOut) return;
+        hasLoggedOut = true;
         if (liff.isLoggedIn()) {
             liff.logout();
         }
