@@ -141,15 +141,13 @@ describe('Unsubscribe Page', () => {
     });
 
     it('shows session expired when idToken is null at page load', async () => {
-      // ページ表示時点でトークンが期限切れ → セッション切れ UI を表示する
+      // ページ表示時点でトークンが期限切れ → fetch より前にセッション切れ UI を表示する
       (liff.getIDToken as any).mockReturnValue(null);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 
+      // fetch は呼ばれない（早期リターン）
+      expect(global.fetch).not.toHaveBeenCalled();
       expect(container.innerHTML).toContain('セッションが切れました');
       expect(container.innerHTML).toContain('3秒後に自動ログアウトします');
       expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
@@ -180,16 +178,14 @@ describe('Unsubscribe Page', () => {
     });
 
     it('shows session expired when context.userId is empty and idToken is null (external browser + expired token)', async () => {
-      // 外部ブラウザかつトークン失効: getProfile() より先に SESSION_EXPIRED をスロー
+      // 外部ブラウザかつトークン失効: fetch より前に早期リターン（getProfile() も呼ばれない）
       (liff.getContext as any).mockReturnValue({ userId: '' });
       (liff.getIDToken as any).mockReturnValue(null);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 
+      // fetch は呼ばれない（早期リターン）
+      expect(global.fetch).not.toHaveBeenCalled();
       // getProfile() は呼ばれない
       expect(liff.getProfile).not.toHaveBeenCalled();
       // セッション切れ UI が表示される
@@ -298,17 +294,15 @@ describe('Unsubscribe Page', () => {
     it('shows session expired when isLoggedIn and isInClient are both false (SPA navigation after session expiry)', async () => {
       // SPA 遷移では initLiff() が再実行されないため、
       // isLoggedIn()/isInClient() が false のまま /unsubscribe に遷移するケースがある。
-      // idToken が null であればセッション切れと判断して自動ログアウト UI を表示する。
+      // idToken が null であれば fetch より前に早期リターンし自動ログアウト UI を表示する。
       (liff.isInClient as any).mockReturnValue(false);
       (liff.isLoggedIn as any).mockReturnValue(false);
       (liff.getIDToken as any).mockReturnValue(null);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 
+      // fetch は呼ばれない（早期リターン）
+      expect(global.fetch).not.toHaveBeenCalled();
       expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
       expect(container.innerHTML).toContain('セッションが切れました');
       // getContext / getProfile は呼ばれない
@@ -451,10 +445,6 @@ describe('Unsubscribe Page', () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(true);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 
@@ -470,10 +460,6 @@ describe('Unsubscribe Page', () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(true);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 
@@ -491,10 +477,6 @@ describe('Unsubscribe Page', () => {
     it('session expired: logout button navigates to root even when not logged in', async () => {
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(false);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 
@@ -510,10 +492,6 @@ describe('Unsubscribe Page', () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(true);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 
@@ -533,10 +511,6 @@ describe('Unsubscribe Page', () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(true);
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('# Unsubscribe Info'),
-      });
 
       await renderUnsubscribe(container);
 

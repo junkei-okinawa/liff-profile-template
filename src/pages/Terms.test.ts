@@ -374,10 +374,11 @@ describe('Terms Page', () => {
     expect(window.location.href).toBe('/');
   });
 
-  it('401: session expired UI moves focus to bottom logout button for keyboard/a11y users', async () => {
-    // agreementSection の innerHTML 差し替え後、フォーカスが下部 #session-logout-btn へ
-    // 移動することを確認する。キーボード操作・支援技術の利用者が次の操作先を見失わないよう
-    // Unsubscribe と同様の a11y 対応を Terms にも適用する。
+  it('401: session expired UI moves focus to sticky top banner logout button for keyboard/a11y users', async () => {
+    // agreementSection の innerHTML 差し替え後、フォーカスが sticky 上部バナーの
+    // #session-logout-btn-top へ移動することを確認する。
+    // 下部の #session-logout-btn へのフォーカスは長い利用規約コンテンツの末尾へ自動スクロールを
+    // 引き起こすため、常にビューポート上部に表示されている上部バナーのボタンへフォーカスする。
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
@@ -391,9 +392,11 @@ describe('Terms Page', () => {
 
     await renderTerms(container);
 
-    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
-    expect(logoutBtn).toBeInTheDocument();
-    expect(logoutBtn).toHaveFocus();
+    const topLogoutBtn = container.querySelector('#session-logout-btn-top') as HTMLButtonElement;
+    expect(topLogoutBtn).toBeInTheDocument();
+    expect(topLogoutBtn).toHaveFocus();
+    // 下部ボタンも存在するが、フォーカスは上部バナーに移動している
+    expect(container.querySelector('#session-logout-btn')).toBeInTheDocument();
   });
 
   it('401: auto-logout fires after 3 seconds when button not clicked', async () => {

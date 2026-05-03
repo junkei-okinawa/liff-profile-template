@@ -159,6 +159,19 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
   const myToken = ++_renderToken;
   container.innerHTML = '<div class="loading">読み込み中...</div>';
 
+  // markdown fetch より前にセッション切れを確認する。
+  // fetch が失敗した場合も自動ログアウト導線に入れるよう最優先で確認する。
+  // showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造を作成してから呼ぶ。
+  if (!liff.getIDToken()) {
+    container.innerHTML = `
+      <div class="terms-container">
+        <div id="unsubscribe-action"></div>
+        <button id="back-btn" style="display: none;"></button>
+      </div>`;
+    showSessionExpiredAndAutoLogout(container);
+    return;
+  }
+
   try {
     const response = await fetch('/unsubscribe.md');
     if (!response.ok) {

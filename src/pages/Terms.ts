@@ -111,11 +111,12 @@ const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: H
     agreementSection.innerHTML = buildSessionExpiredHtml('session-logout-btn');
 
     // agreementSection の innerHTML 差し替えでフォーカスが失われるため、
-    // キーボード操作・支援技術の利用者が次の操作先を見失わないよう
-    // 新しく表示した「今すぐログアウト」ボタン（下部）へフォーカスを移す。
-    const sessionLogoutBtnFocus = agreementSection.querySelector<HTMLButtonElement>('#session-logout-btn');
-    if (sessionLogoutBtnFocus) {
-        sessionLogoutBtnFocus.focus();
+    // キーボード操作・支援技術の利用者が次の操作先を見失わないようフォーカスを移す。
+    // 下部ボタンへの focus() は長い Terms コンテンツ末尾まで自動スクロールを引き起こすため、
+    // 常にビューポート上部に表示されている sticky バナーのボタンへフォーカスする。
+    const topLogoutBtnFocus = container.querySelector<HTMLButtonElement>('#session-logout-btn-top');
+    if (topLogoutBtnFocus) {
+        topLogoutBtnFocus.focus();
     }
 
     // タイマー満了・上部ボタン・下部ボタンが重なっても liff.logout() と
