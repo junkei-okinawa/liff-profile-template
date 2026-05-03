@@ -84,8 +84,12 @@ describe('Unsubscribe Page', () => {
 
       expect(container.innerHTML).toContain('Mock Unsubscribe Content');
       expect(container.querySelector('#unsubscribe-action')).toBeInTheDocument();
-      expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument();
       expect(container.querySelector('#back-btn')).toBeInTheDocument();
+      // セッション確認完了後にボタンが有効化され「退会する」になっていることを確認
+      const btn = container.querySelector('#unsubscribe-btn') as HTMLButtonElement;
+      expect(btn).toBeInTheDocument();
+      expect(btn).not.toBeDisabled();
+      expect(btn).toHaveTextContent('退会する');
     });
 
     it('handles back button via replaceState to profile page', async () => {
@@ -333,7 +337,58 @@ describe('Unsubscribe Page', () => {
       expect(logoutBtn).toHaveFocus();
     });
 
-    it('401: auto-logout fires after 3 seconds when button not clicked', async () => {
+    it('stale render result does not overwrite DOM when second render starts before first completes', async () => {
+      // レースコンディション再現:
+      // 1. 第1レンダーが getUserIdAndToken() で getProfile() を待機中
+      // 2. ルーターが画面遷移 → 第2レンダーが開始
+      // 3. 第1レンダーの getProfile() が失敗 → _renderToken 不一致のため DOM 書き換えをスキップする
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      // getProfile が外から制御可能なプロミスを返すよう設定する
+      let rejectGetProfile!: (e: Error) => void;
+      (liff.getProfile as any).mockImplementation(
+        () => new Promise<never>((_, reject) => { rejectGetProfile = reject; })
+      );
+
+      // 第1レンダーのフェッチ
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      // 第1レンダーを開始（await しない）
+      const firstRender = renderUnsubscribe(container);
+
+      // マイクロタスクを消化して fetch + HTML 描画まで進める
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // 第2レンダー開始（ルーターが /unsubscribe へ再遷移したケースを模擬）
+      (liff.getContext as any).mockReturnValue({ userId: mockUserId });
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+      await renderUnsubscribe(container);
+
+      // 第2レンダー成功: ボタンが有効化されている
+      const btn = container.querySelector<HTMLButtonElement>('#unsubscribe-btn');
+      expect(btn).toBeInTheDocument();
+      expect(btn).not.toBeDisabled();
+      expect(btn).toHaveTextContent('退会する');
+
+      // 第1レンダーの getProfile が遅れて失敗しても DOM を上書きしない
+      rejectGetProfile(new Error('delayed network failure'));
+      await firstRender;
+
+      // 第2レンダーの成功状態が維持される
+      expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
+      expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument();
+      expect(btn).not.toBeDisabled();
+    });
+
+    it('session expired: auto-logout fires after 3 seconds when button not clicked', async () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(true);
@@ -352,7 +407,7 @@ describe('Unsubscribe Page', () => {
       expect(window.location.href).toBe('/');
     });
 
-    it('401: clicking logout button cancels auto-logout timer', async () => {
+    it('session expired: clicking logout button cancels auto-logout timer', async () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(true);
@@ -374,7 +429,7 @@ describe('Unsubscribe Page', () => {
       expect(liff.logout).toHaveBeenCalledTimes(1);
     });
 
-    it('401: logout button navigates to root even when not logged in', async () => {
+    it('session expired: logout button navigates to root even when not logged in', async () => {
       (liff.getIDToken as any).mockReturnValue(null);
       (liff.isLoggedIn as any).mockReturnValue(false);
       (global.fetch as any).mockResolvedValueOnce({
@@ -391,7 +446,7 @@ describe('Unsubscribe Page', () => {
       expect(window.location.href).toBe('/');
     });
 
-    it('401: doLogout is not called twice when timer fires and button is clicked simultaneously', async () => {
+    it('session expired: doLogout is not called twice when timer fires and button is clicked simultaneously', async () => {
       // タイマー満了とボタンクリックが重なっても liff.logout() が二重呼び出しされないことを確認
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
@@ -413,7 +468,7 @@ describe('Unsubscribe Page', () => {
       expect(liff.logout).toHaveBeenCalledTimes(1); // 重複しない
     });
 
-    it('401: cleanupUnsubscribeTimer cancels auto-logout timer before page navigation', async () => {
+    it('session expired: cleanupUnsubscribeTimer cancels auto-logout timer before page navigation', async () => {
       // ページ遷移時に router が cleanup を呼ぶことでタイマーが止まり、
       // 別ページ描画後に logout が発火しないことを確認する回帰テスト
       vi.useFakeTimers();

@@ -20,6 +20,11 @@ let _autoLogoutTimer: ReturnType<typeof setTimeout> | null = null;
 // Global variable to track the interval so it can be cleaned up
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
+// レンダートークン: renderUnsubscribe() が呼ばれるたびにインクリメントする。
+// getUserIdAndToken() 等の非同期処理が完了した時点で最新のトークンと一致するか確認し、
+// 古いレンダーの結果が新しいページの DOM を上書きするレースコンディションを防ぐ。
+let _renderToken = 0;
+
 export const cleanupUnsubscribeTimer = (): void => {
   if (countdownInterval) {
     clearInterval(countdownInterval);
@@ -134,6 +139,10 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
 };
 
 export const renderUnsubscribe = async (container: HTMLElement): Promise<void> => {
+  // このレンダー呼び出しのトークンを取得する。
+  // 非同期処理の完了後にトークンが変わっていれば別のレンダーが始まっているため、
+  // 古い結果で DOM を上書きしないようにする。
+  const myToken = ++_renderToken;
   container.innerHTML = '<div class="loading">読み込み中...</div>';
 
   try {
@@ -145,6 +154,10 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     const parsedHtml = await marked.parse(text);
     const htmlContent = DOMPurify.sanitize(parsedHtml);
 
+    // fetch 完了後にトークンを確認する。
+    // 別のレンダーが始まっていれば、この結果は既に不要なので終了する。
+    if (_renderToken !== myToken) return;
+
     const html = `
       <div class="terms-container">
         <div class="terms-content">
@@ -153,8 +166,9 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
 
         <div style="margin-top: 30px; text-align: center;">
           <div id="unsubscribe-action">
-            <button id="unsubscribe-btn" style="padding: 12px 24px; background: #ff4d4f; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-bottom: 20px;">
-              退会する
+            <button id="unsubscribe-btn" disabled
+              style="padding: 12px 24px; background: #ccc; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: not-allowed; margin-bottom: 20px;">
+              確認中...
             </button>
           </div>
           <br>
@@ -184,6 +198,8 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     try {
       await getUserIdAndToken();
     } catch (e: unknown) {
+      // 非同期処理完了後にトークンを確認する。別レンダーが始まっていれば終了する。
+      if (_renderToken !== myToken) return;
       const isSessionExpired = e instanceof SessionExpiredError;
       if (isSessionExpired) {
         showSessionExpiredAndAutoLogout(container);
@@ -197,8 +213,15 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       return;
     }
 
-    const unsubscribeBtn = document.getElementById('unsubscribe-btn');
+    // セッション確認成功。トークンを確認してから退会ボタンを有効化する。
+    if (_renderToken !== myToken) return;
+
+    const unsubscribeBtn = document.getElementById('unsubscribe-btn') as HTMLButtonElement | null;
     if (unsubscribeBtn) {
+      unsubscribeBtn.disabled = false;
+      unsubscribeBtn.style.background = '#ff4d4f';
+      unsubscribeBtn.style.cursor = 'pointer';
+      unsubscribeBtn.textContent = '退会する';
       unsubscribeBtn.onclick = async () => {
         // ボタン押下時に idToken を再取得する。
         // ページ表示後にトークンが期限切れになっている可能性があるため、
@@ -227,6 +250,7 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     }
 
   } catch (error: unknown) {
+    if (_renderToken !== myToken) return;
     console.error('Unsubscribe page error:', error);
     container.innerHTML = `<div class="container"><p style="color:red">ページの表示中にエラーが発生しました。</p></div>`;
   }
