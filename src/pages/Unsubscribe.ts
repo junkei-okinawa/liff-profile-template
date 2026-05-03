@@ -31,14 +31,17 @@ export const cleanupUnsubscribeTimer = (): void => {
   }
 };
 
-// 401（セッション切れ）時の共通 UI 表示関数。
+// セッション切れ（idToken が null）を検知した際の共通 UI 表示関数。
+// ページ初期表示時の getIDToken() === null、getProfile() 待機中の失効、
+// 退会ボタン押下時の再確認など、複数のコードパスから呼ばれる。
 // - buildSessionExpiredHtml() で Terms と共通の文言・スタイルを使用
 // - role="alert" aria-live="assertive" でスクリーンリーダーに即時通知
+// - フォーカスを「今すぐログアウト」ボタンへ移動しキーボード操作を保持
 // - 「キャンセルして戻る」ボタンを非表示にして期限切れセッションのまま遷移を防ぐ
 // - 3秒後に自動ログアウト（module スコープタイマーで cleanup 可能）
 // - hasLoggedOut ガードでタイマー満了とボタンクリックの同時発生による二重実行を防止
 const showSessionExpiredAndAutoLogout = (container: HTMLElement): void => {
-  // 401 時は戻る導線を塞ぎ、期限切れセッションのまま Profile に戻れないようにする
+  // セッション切れ時は戻る導線を塞ぎ、期限切れセッションのまま Profile に戻れないようにする
   const backBtn = container.querySelector('#back-btn') as HTMLButtonElement | null;
   if (backBtn) {
     backBtn.style.display = 'none';

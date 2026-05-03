@@ -36,7 +36,11 @@ describe('Unsubscribe Page', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
 
-    // Reset mocks
+    // clearAllMocks() で呼び出し履歴・インスタンス・結果をリセットする。
+    // resetAllMocks() は vi.mock() で定義したモジュールモック（marked.parse 等）の実装も
+    // リセットしてしまうため使用しない。
+    // getProfile 等テストごとに差し替える実装の漏れは、
+    // 下記でデフォルト実装を beforeEach 内に明示することで対処する。
     vi.clearAllMocks();
 
     // Suppress console.error / console.warn for expected errors
@@ -58,6 +62,8 @@ describe('Unsubscribe Page', () => {
     (liff.isLoggedIn as any).mockReturnValue(true);
     (liff.getContext as any).mockReturnValue({ userId: mockUserId });
     (liff.getIDToken as any).mockReturnValue(mockIdToken);
+    // getProfile のデフォルト実装を明示し、テスト間の実装漏れを防ぐ
+    (liff.getProfile as any).mockResolvedValue({ userId: mockUserId });
   });
 
   afterEach(() => {
@@ -231,6 +237,25 @@ describe('Unsubscribe Page', () => {
       // この防御バリデーションが将来削除された場合にテストで検知できるよう押さえる。
       (liff.getContext as any).mockReturnValue({ userId: '' });
       (liff.getProfile as any).mockResolvedValue({ userId: '' });
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      expect(container.innerHTML).toContain('ユーザー情報の取得に失敗しました');
+      // セッション切れ UI は表示されない
+      expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
+      // 退会ボタンは表示されない
+      expect(container.querySelector('#unsubscribe-btn')).not.toBeInTheDocument();
+    });
+
+    it('shows user info error when getProfile returns whitespace-only userId', async () => {
+      // userId.trim() === '' のバリデーションが有効であることを確認する。
+      // 将来 trim() チェックが外れた場合にこのテストで検知できる。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockResolvedValue({ userId: '   ' }); // 空白のみ
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve('# Unsubscribe Info'),
