@@ -145,6 +145,56 @@ describe('Unsubscribe Page', () => {
       expect(container.querySelector('#unsubscribe-btn')).not.toBeInTheDocument();
     });
 
+    it('falls back to getProfile when context.userId is empty and renders normally', async () => {
+      // 外部ブラウザ環境: getContext().userId が空 → getProfile() でフォールバック成功
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockResolvedValue({ userId: mockUserId });
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      // 正常描画: 退会ボタンが表示される
+      expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument();
+      expect(container.querySelector('#session-logout-btn')).not.toBeInTheDocument();
+    });
+
+    it('shows session expired when context.userId is empty and idToken is null (external browser + expired token)', async () => {
+      // 外部ブラウザかつトークン失効: getProfile() より先に SESSION_EXPIRED をスロー
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getIDToken as any).mockReturnValue(null);
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      // getProfile() は呼ばれない
+      expect(liff.getProfile).not.toHaveBeenCalled();
+      // セッション切れ UI が表示される
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+      expect(container.innerHTML).toContain('セッションが切れました');
+    });
+
+    it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {
+      // 外部ブラウザかつ idToken は有効だが getProfile が別の理由で失敗
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockRejectedValue(new Error('Network error'));
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      // 汎用エラーが表示され、セッション切れ UI は表示されない
+      expect(container.innerHTML).toContain('ユーザー情報の取得に失敗しました');
+      expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
+    });
+
     it('shows session expired when idToken becomes null at button click time', async () => {
       // ページ読み込み時はトークンあり → ボタン押下時に期限切れ
       (global.fetch as any).mockResolvedValueOnce({
