@@ -219,6 +219,27 @@ describe('Unsubscribe Page', () => {
       expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
     });
 
+    it('shows session expired when token expires after getProfile() succeeds', async () => {
+      // getProfile() は成功したが完了直後にトークンが失効するケース。
+      // getUserIdAndToken() 末尾の freshIdToken 再取得で SessionExpiredError をスローする。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockImplementation(async () => {
+        (liff.getIDToken as any).mockReturnValue(null); // getProfile 完了直後に失効
+        return { userId: mockUserId };
+      });
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      // 汎用エラーではなくセッション切れ UI が表示される
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+      expect(container.innerHTML).toContain('セッションが切れました');
+      expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
+    });
+
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {
       // 外部ブラウザかつ idToken は有効だが getProfile が別の理由で失敗
       (liff.getContext as any).mockReturnValue({ userId: '' });

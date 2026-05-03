@@ -105,12 +105,13 @@ const showSessionExpiredAndAutoLogout = (container: HTMLElement): void => {
 // idToken が null（期限切れ）の場合は SESSION_EXPIRED エラーをスローする。
 // SPA 遷移では initLiff() が再実行されないため、isInClient()/isLoggedIn() の状態に
 // 関わらず関数冒頭で idToken を確認することで全コードパスをカバーする。
+// 戻り値の idToken は getProfile() 等の非同期処理完了後に再取得した最新値であるため、
+// 関数呼び出し時点のトークンが stale になる問題を回避している。
 const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }> => {
   // 最初に idToken を確認する。
   // isInClient()/isLoggedIn() が false の状態（SPA 遷移後のセッション切れ等）でも
   // SESSION_EXPIRED を正しくスローするために、userId 取得より先に確認する。
-  const idToken = liff.getIDToken();
-  if (!idToken) {
+  if (!liff.getIDToken()) {
     throw new SessionExpiredError();
   }
 
@@ -140,7 +141,15 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
     throw new Error('無効なユーザーID: ユーザーIDを取得できませんでした。');
   }
 
-  return { userId, idToken };
+  // getProfile() 等の非同期処理完了後にトークンを再取得する。
+  // 関数冒頭で取得した idToken は getProfile() 待機中に stale になる可能性があるため、
+  // 戻り値には必ず最新のトークンを使用する。
+  const freshIdToken = liff.getIDToken();
+  if (!freshIdToken) {
+    throw new SessionExpiredError();
+  }
+
+  return { userId, idToken: freshIdToken };
 };
 
 export const renderUnsubscribe = async (container: HTMLElement): Promise<void> => {
