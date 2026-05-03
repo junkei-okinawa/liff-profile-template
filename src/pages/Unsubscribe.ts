@@ -112,6 +112,11 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
         const profile = await liff.getProfile();
         userId = profile.userId;
       } catch (e) {
+        // getProfile() の非同期待機中にセッションが失効した可能性を確認する。
+        // トークンが null になっていれば SESSION_EXPIRED として扱い、自動ログアウト導線へ進む。
+        if (!liff.getIDToken()) {
+          throw new SessionExpiredError();
+        }
         console.warn('Could not get userId from context or profile for unsubscribe', e);
         throw new Error('ユーザーIDの取得に失敗しました。LINEログイン状態を確認してください。');
       }
@@ -162,7 +167,11 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
       backBtn.onclick = () => {
-        window.history.back();
+        // history.back() は BOT URL 等から直接アクセスした場合に履歴がなく機能しない。
+        // Terms と同様に replaceState でプロフィールページに置き換え、
+        // pushState による履歴ループを防ぐ。
+        window.history.replaceState({}, '', '/profile/me');
+        window.dispatchEvent(new Event('popstate'));
       };
     }
 

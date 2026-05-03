@@ -82,7 +82,9 @@ describe('Unsubscribe Page', () => {
       expect(container.querySelector('#back-btn')).toBeInTheDocument();
     });
 
-    it('handles back button', async () => {
+    it('handles back button via replaceState to profile page', async () => {
+      // history.back() は BOT URL 等から直接アクセスした場合に履歴がなく機能しないため、
+      // Terms と同様に replaceState('/profile/me') + popstate イベントを使う。
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve('# Unsubscribe Info'),
@@ -90,11 +92,17 @@ describe('Unsubscribe Page', () => {
 
       await renderUnsubscribe(container);
 
-      const backSpy = vi.spyOn(window.history, 'back');
+      const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+      const popstateSpy = vi.fn();
+      window.addEventListener('popstate', popstateSpy);
+
       const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
       backBtn.click();
 
-      expect(backSpy).toHaveBeenCalled();
+      expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/profile/me');
+      expect(popstateSpy).toHaveBeenCalled();
+
+      window.removeEventListener('popstate', popstateSpy);
     });
 
     it('handles unsubscribe button (navigation to complete)', async () => {
@@ -177,6 +185,28 @@ describe('Unsubscribe Page', () => {
       // セッション切れ UI が表示される
       expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
       expect(container.innerHTML).toContain('セッションが切れました');
+    });
+
+    it('shows session expired when token expires during getProfile() call', async () => {
+      // getProfile() の非同期待機中にセッションが失効するケース。
+      // catch ブロック内で getIDToken() を再確認し、null なら SessionExpiredError をスローする。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      // getProfile() が失敗し、かつその時点でトークンが失効している状態を模擬
+      (liff.getProfile as any).mockImplementation(async () => {
+        (liff.getIDToken as any).mockReturnValue(null); // 待機中に失効
+        throw new Error('token expired during call');
+      });
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      // 汎用エラーではなくセッション切れ UI が表示される
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+      expect(container.innerHTML).toContain('セッションが切れました');
+      expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
     });
 
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {
