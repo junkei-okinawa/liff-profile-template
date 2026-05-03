@@ -258,6 +258,26 @@ describe('Unsubscribe Page', () => {
       expect(backBtn).not.toBeVisible();
     });
 
+    it('session expired UI moves focus to logout button for keyboard/a11y users', async () => {
+      // #unsubscribe-btn の innerHTML 差し替え後、フォーカスが #session-logout-btn へ移動することを確認する。
+      // キーボード操作・支援技術の利用者が次の操作先を見失わないようにするための a11y テスト。
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      (liff.getIDToken as any).mockReturnValue(null);
+
+      const unsubscribeBtn = container.querySelector('#unsubscribe-btn') as HTMLButtonElement;
+      unsubscribeBtn.click();
+
+      const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+      expect(logoutBtn).toBeInTheDocument();
+      expect(logoutBtn).toHaveFocus();
+    });
+
     it('401: auto-logout fires after 3 seconds when button not clicked', async () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);

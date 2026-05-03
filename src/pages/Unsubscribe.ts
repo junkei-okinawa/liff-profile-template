@@ -53,6 +53,14 @@ const showSessionExpiredAndAutoLogout = (container: HTMLElement): void => {
     `;
   }
 
+  // innerHTML 差し替えで元の退会ボタンのフォーカスが失われるため、
+  // キーボード操作・支援技術の利用者が次の操作先を見失わないよう
+  // 新しく表示した「今すぐログアウト」ボタンへフォーカスを移す。
+  const sessionLogoutBtnEl = container.querySelector<HTMLButtonElement>('#session-logout-btn');
+  if (sessionLogoutBtnEl) {
+    sessionLogoutBtnEl.focus();
+  }
+
   // タイマー満了とボタンクリックがほぼ同時になっても doLogout() が二重実行されないよう
   // hasLoggedOut フラグでガードする。
   let hasLoggedOut = false;
