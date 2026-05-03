@@ -374,6 +374,28 @@ describe('Terms Page', () => {
     expect(window.location.href).toBe('/');
   });
 
+  it('401: session expired UI moves focus to bottom logout button for keyboard/a11y users', async () => {
+    // agreementSection の innerHTML 差し替え後、フォーカスが下部 #session-logout-btn へ
+    // 移動することを確認する。キーボード操作・支援技術の利用者が次の操作先を見失わないよう
+    // Unsubscribe と同様の a11y 対応を Terms にも適用する。
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+    await renderTerms(container);
+
+    const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+    expect(logoutBtn).toBeInTheDocument();
+    expect(logoutBtn).toHaveFocus();
+  });
+
   it('401: auto-logout fires after 3 seconds when button not clicked', async () => {
     vi.useFakeTimers();
     (global.fetch as any)

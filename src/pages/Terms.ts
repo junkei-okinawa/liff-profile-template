@@ -110,6 +110,14 @@ const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: H
     // 最下部の同意エリアも同じメッセージで更新し、下まで読んだユーザーにも通知する
     agreementSection.innerHTML = buildSessionExpiredHtml('session-logout-btn');
 
+    // agreementSection の innerHTML 差し替えでフォーカスが失われるため、
+    // キーボード操作・支援技術の利用者が次の操作先を見失わないよう
+    // 新しく表示した「今すぐログアウト」ボタン（下部）へフォーカスを移す。
+    const sessionLogoutBtnFocus = agreementSection.querySelector<HTMLButtonElement>('#session-logout-btn');
+    if (sessionLogoutBtnFocus) {
+        sessionLogoutBtnFocus.focus();
+    }
+
     // タイマー満了・上部ボタン・下部ボタンが重なっても liff.logout() と
     // href='/' が二重実行されないよう hasLoggedOut フラグでガードする。
     let hasLoggedOut = false;
