@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import liff from '@line/liff';
 import { config } from '../config';
 import { TERMS_UPDATED_AT } from '../shared-constants';
+import { buildSessionExpiredHtml } from '../utils/session-ui';
 
 // module スコープで 401 自動ログアウトタイマーIDを保持する。
 // ページ遷移時にルーターから cleanupTermsAutoLogoutTimer() を呼ぶことで
@@ -78,16 +79,6 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
         container.innerHTML = `<div class="container"><p style="color:red">規約の表示中にエラーが発生しました。</p></div>`;
     }
 };
-
-// セッション切れメッセージとログアウトボタンの HTML を生成する純粋関数。
-// 上部バナー・下部エリアで共用し、文言・ボタンスタイルの変更を一箇所に集約する。
-const buildSessionExpiredHtml = (btnId: string): string => `
-    <p style="color: #e65c00; font-weight: bold; margin: 0 0 6px;">セッションが切れました。</p>
-    <p style="color: #666; font-size: 0.9rem; margin: 0 0 10px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-    <button id="${btnId}" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
-        今すぐログアウト
-    </button>
-`;
 
 // GET /status・POST /agreement 両方の 401 で使う共通 UI 表示関数。
 // - ページ最上部に sticky バナーを追加し、スクロール位置に関わらずセッション切れを即座に通知

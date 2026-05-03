@@ -316,6 +316,28 @@ describe('Unsubscribe Page', () => {
       expect(window.location.href).toBe('/');
     });
 
+    it('401: doLogout is not called twice when timer fires and button is clicked simultaneously', async () => {
+      // タイマー満了とボタンクリックが重なっても liff.logout() が二重呼び出しされないことを確認
+      vi.useFakeTimers();
+      (liff.getIDToken as any).mockReturnValue(null);
+      (liff.isLoggedIn as any).mockReturnValue(true);
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      // タイマー満了 → doLogout() 1回目
+      vi.advanceTimersByTime(3000);
+      expect(liff.logout).toHaveBeenCalledTimes(1);
+
+      // タイマー満了直後にボタンクリック → hasLoggedOut ガードで skip
+      const logoutBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+      logoutBtn.click();
+      expect(liff.logout).toHaveBeenCalledTimes(1); // 重複しない
+    });
+
     it('401: cleanupUnsubscribeTimer cancels auto-logout timer before page navigation', async () => {
       // ページ遷移時に router が cleanup を呼ぶことでタイマーが止まり、
       // 別ページ描画後に logout が発火しないことを確認する回帰テスト

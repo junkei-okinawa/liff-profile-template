@@ -1,6 +1,16 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import liff from '@line/liff';
+import { buildSessionExpiredHtml } from '../utils/session-ui';
+
+// SESSION_EXPIRED を文字列比較ではなく instanceof で判定するための専用エラー型。
+// 文言変更やラップされた例外によって自動ログアウト導線が壊れるリスクを排除する。
+class SessionExpiredError extends Error {
+  constructor() {
+    super('SESSION_EXPIRED');
+    this.name = 'SessionExpiredError';
+  }
+}
 
 // module スコープでセッション切れ自動ログアウトタイマーIDを保持する。
 // ページ遷移時にルーターから cleanupUnsubscribeTimer() を呼ぶことで
@@ -22,9 +32,11 @@ export const cleanupUnsubscribeTimer = (): void => {
 };
 
 // 401（セッション切れ）時の共通 UI 表示関数。
+// - buildSessionExpiredHtml() で Terms と共通の文言・スタイルを使用
 // - role="alert" aria-live="assertive" でスクリーンリーダーに即時通知
 // - 「キャンセルして戻る」ボタンを非表示にして期限切れセッションのまま遷移を防ぐ
 // - 3秒後に自動ログアウト（module スコープタイマーで cleanup 可能）
+// - hasLoggedOut ガードでタイマー満了とボタンクリックの同時発生による二重実行を防止
 const showSessionExpiredAndAutoLogout = (container: HTMLElement): void => {
   // 401 時は戻る導線を塞ぎ、期限切れセッションのまま Profile に戻れないようにする
   const backBtn = container.querySelector('#back-btn') as HTMLButtonElement | null;
@@ -36,16 +48,17 @@ const showSessionExpiredAndAutoLogout = (container: HTMLElement): void => {
   if (unsubscribeAction) {
     unsubscribeAction.innerHTML = `
       <div role="alert" aria-live="assertive">
-        <p style="color: #e65c00; font-weight: bold;">セッションが切れました。</p>
-        <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-        <button id="session-logout-btn" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
-          今すぐログアウト
-        </button>
+        ${buildSessionExpiredHtml('session-logout-btn')}
       </div>
     `;
   }
 
+  // タイマー満了とボタンクリックがほぼ同時になっても doLogout() が二重実行されないよう
+  // hasLoggedOut フラグでガードする。
+  let hasLoggedOut = false;
   const doLogout = () => {
+    if (hasLoggedOut) return;
+    hasLoggedOut = true;
     if (liff.isLoggedIn()) {
       liff.logout();
     }
@@ -77,7 +90,7 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
   // SESSION_EXPIRED を正しくスローするために、userId 取得より先に確認する。
   const idToken = liff.getIDToken();
   if (!idToken) {
-    throw new Error('SESSION_EXPIRED');
+    throw new SessionExpiredError();
   }
 
   let userId = '';
@@ -151,7 +164,7 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     try {
       await getUserIdAndToken();
     } catch (e: unknown) {
-      const isSessionExpired = e instanceof Error && e.message === 'SESSION_EXPIRED';
+      const isSessionExpired = e instanceof SessionExpiredError;
       if (isSessionExpired) {
         showSessionExpiredAndAutoLogout(container);
       } else {
