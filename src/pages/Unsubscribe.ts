@@ -69,10 +69,17 @@ const showSessionExpiredAndAutoLogout = (container: HTMLElement): void => {
 
 // 退会処理に必要な userId と idToken を取得する。
 // idToken が null（期限切れ）の場合は SESSION_EXPIRED エラーをスローする。
-// context.userId が取れない外部ブラウザ環境では getProfile() でフォールバックするが、
-// その前に idToken を確認し、失効済みなら SESSION_EXPIRED を優先してスローする。
-// （getProfile() が失敗した場合、原因がトークン失効か別エラーかを区別できないため。）
+// SPA 遷移では initLiff() が再実行されないため、isInClient()/isLoggedIn() の状態に
+// 関わらず関数冒頭で idToken を確認することで全コードパスをカバーする。
 const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }> => {
+  // 最初に idToken を確認する。
+  // isInClient()/isLoggedIn() が false の状態（SPA 遷移後のセッション切れ等）でも
+  // SESSION_EXPIRED を正しくスローするために、userId 取得より先に確認する。
+  const idToken = liff.getIDToken();
+  if (!idToken) {
+    throw new Error('SESSION_EXPIRED');
+  }
+
   let userId = '';
 
   if (liff.isInClient() || liff.isLoggedIn()) {
@@ -80,14 +87,6 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
     userId = context?.userId || '';
 
     if (!userId) {
-      // getProfile() を試みる前に idToken を確認する。
-      // 外部ブラウザでトークンが失効している場合、getProfile() も失敗するが
-      // その失敗を汎用エラーに変換してしまうとセッション切れ UI に到達できなくなるため、
-      // トークン失効を先に検出して SESSION_EXPIRED をスローする。
-      const earlyIdToken = liff.getIDToken();
-      if (!earlyIdToken) {
-        throw new Error('SESSION_EXPIRED');
-      }
       try {
         const profile = await liff.getProfile();
         userId = profile.userId;
@@ -100,11 +99,6 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
 
   if (!userId || userId.trim() === '') {
     throw new Error('無効なユーザーID: ユーザーIDを取得できませんでした。');
-  }
-
-  const idToken = liff.getIDToken();
-  if (!idToken) {
-    throw new Error('SESSION_EXPIRED');
   }
 
   return { userId, idToken };

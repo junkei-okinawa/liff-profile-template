@@ -195,6 +195,27 @@ describe('Unsubscribe Page', () => {
       expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
     });
 
+    it('shows session expired when isLoggedIn and isInClient are both false (SPA navigation after session expiry)', async () => {
+      // SPA 遷移では initLiff() が再実行されないため、
+      // isLoggedIn()/isInClient() が false のまま /unsubscribe に遷移するケースがある。
+      // idToken が null であればセッション切れと判断して自動ログアウト UI を表示する。
+      (liff.isInClient as any).mockReturnValue(false);
+      (liff.isLoggedIn as any).mockReturnValue(false);
+      (liff.getIDToken as any).mockReturnValue(null);
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      await renderUnsubscribe(container);
+
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+      expect(container.innerHTML).toContain('セッションが切れました');
+      // getContext / getProfile は呼ばれない
+      expect(liff.getContext).not.toHaveBeenCalled();
+      expect(liff.getProfile).not.toHaveBeenCalled();
+    });
+
     it('shows session expired when idToken becomes null at button click time', async () => {
       // ページ読み込み時はトークンあり → ボタン押下時に期限切れ
       (global.fetch as any).mockResolvedValueOnce({
