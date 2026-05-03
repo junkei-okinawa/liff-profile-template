@@ -26,6 +26,11 @@ let countdownInterval: ReturnType<typeof setInterval> | null = null;
 let _renderToken = 0;
 
 export const cleanupUnsubscribeTimer = (): void => {
+  // _renderToken をインクリメントして進行中の renderUnsubscribe() を無効化する。
+  // router がページ離脱時にこの関数を呼ぶことで、古い fetch() / getProfile() が
+  // 遅れて完了しても別ページの DOM を退会ページで上書きしなくなる。
+  _renderToken++;
+
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;

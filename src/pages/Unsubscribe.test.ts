@@ -388,6 +388,44 @@ describe('Unsubscribe Page', () => {
       expect(btn).not.toBeDisabled();
     });
 
+    it('cleanupUnsubscribeTimer invalidates in-progress render so stale result does not overwrite other pages', async () => {
+      // ルーターがページ離脱時に cleanupUnsubscribeTimer() を呼ぶことで
+      // 進行中の getUserIdAndToken() が完了しても別ページの DOM を上書きしないことを確認する。
+      // （renderUnsubscribe() が2回目呼ばれない「別ページへの遷移」ケース）
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      let rejectGetProfile!: (e: Error) => void;
+      (liff.getProfile as any).mockImplementation(
+        () => new Promise<never>((_, reject) => { rejectGetProfile = reject; })
+      );
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      // レンダー開始（await しない）
+      const renderPromise = renderUnsubscribe(container);
+
+      // マイクロタスクを消化して fetch + HTML 描画まで進める
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
+      cleanupUnsubscribeTimer();
+      container.innerHTML = '<div id="other-page">別のページ</div>';
+
+      // 遅れて getProfile が失敗 → DOM を上書きしてはいけない
+      rejectGetProfile(new Error('delayed failure'));
+      await renderPromise;
+
+      // 別ページのコンテンツが維持されている
+      expect(container.innerHTML).toContain('別のページ');
+      expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
+      expect(container.innerHTML).not.toContain('退会する');
+    });
+
     it('session expired: auto-logout fires after 3 seconds when button not clicked', async () => {
       vi.useFakeTimers();
       (liff.getIDToken as any).mockReturnValue(null);
