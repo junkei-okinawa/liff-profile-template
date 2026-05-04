@@ -195,8 +195,8 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     const parsedHtml = await marked.parse(text);
     const htmlContent = DOMPurify.sanitize(parsedHtml);
 
-    // fetch 完了後にトークンを確認する。
-    // 別のレンダーが始まっていれば、この結果は既に不要なので終了する。
+    // 別のレンダーが開始されていないかを確認する。
+    // 開始されていれば、この結果は既に不要なので終了する。
     if (_renderToken !== myToken) return;
 
     const html = `
@@ -304,18 +304,25 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
 
     if (_userInfoRejection instanceof SessionExpiredError) {
       // showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造を作成する。
-      // fetch 失敗時は HTML が未描画のため、早期チェックと同じ構造を使う。
-      container.innerHTML = `
-        <div class="terms-container">
-          <div id="unsubscribe-action"></div>
-          <button id="back-btn" style="display: none;"></button>
-        </div>`;
+      // fetch 失敗時は HTML が未描画のため、SESSION_EXPIRED_SHELL_HTML を使う。
+      container.innerHTML = SESSION_EXPIRED_SHELL_HTML;
       showSessionExpiredAndAutoLogout(container);
       return;
     }
 
     console.error('Unsubscribe page error:', error);
     container.innerHTML = `<div class="container"><p style="color:red">ページの表示中にエラーが発生しました。</p></div>`;
+
+    // マイクロタスク 1 回の確認で見逃した遅延 SessionExpiredError にも対応する。
+    // getProfile() が pending のまま fetch が失敗した後、getProfile() が後から
+    // SessionExpiredError で失敗した場合もセッション切れ UI に更新する。
+    // _renderToken === myToken ガードで別ページ遷移後の更新を防ぐ。
+    userInfoPromise.catch((e) => {
+      if (e instanceof SessionExpiredError && _renderToken === myToken) {
+        container.innerHTML = SESSION_EXPIRED_SHELL_HTML;
+        showSessionExpiredAndAutoLogout(container);
+      }
+    });
   }
 };
 

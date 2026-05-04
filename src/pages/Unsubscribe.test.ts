@@ -326,46 +326,66 @@ describe('Unsubscribe Page', () => {
       expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
     });
 
-    it('stale render: fetch failure + pending getProfile during navigation does not overwrite other page DOM', async () => {
-      // fetch が失敗した後、outer catch は await Promise.resolve() 1 回だけ yield する。
-      // getProfile が pending のまま navigation が発生した場合も _renderToken ガードで
-      // 別ページの DOM を上書きしないことを確認する。
+    it('shows session expired UI when getProfile rejects with SessionExpiredError after fetch failure', async () => {
+      // fetch 失敗後に汎用エラーが表示された後、遅れて getProfile が SessionExpiredError で失敗した場合、
+      // エラーページに取り残されずにセッション切れ UI が表示されることを確認する。
       (liff.getContext as any).mockReturnValue({ userId: '' });
 
-      // getProfile を外部から制御可能にする
-      let resolveGetProfile!: (v: { userId: string }) => void;
+      let rejectGetProfile!: (e: Error) => void;
       (liff.getProfile as any).mockImplementation(
-        () => new Promise<{ userId: string }>(resolve => { resolveGetProfile = resolve; })
+        () => new Promise<never>((_, reject) => { rejectGetProfile = reject; })
       );
 
-      // fetch は失敗
       (global.fetch as any).mockResolvedValueOnce({
         ok: false,
         status: 503,
         statusText: 'Service Unavailable',
       });
 
-      // レンダー開始（await しない）
-      const renderPromise = renderUnsubscribe(container);
+      // fetch 失敗 → outer catch が getProfile を await しないのですぐ返る
+      await renderUnsubscribe(container);
+      expect(container.innerHTML).toContain('ページの表示中にエラーが発生しました');
 
-      // マイクロタスクを消化して fetch 失敗まで進める
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      // getProfile が失敗 + トークン失効 → getUserIdAndToken が SessionExpiredError をスロー
+      (liff.getIDToken as any).mockReturnValue(null);
+      rejectGetProfile(new Error('token expired during getProfile'));
 
-      // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
+      // セッション切れ UI に更新されるまで待つ
+      await vi.waitFor(() => expect(container.innerHTML).toContain('セッションが切れました'));
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+    });
+
+    it('stale render: delayed SessionExpiredError after fetch failure does not overwrite navigation target', async () => {
+      // fetch 失敗後に navigation が発生した後、遅れた SessionExpiredError が
+      // _renderToken ガードにより別ページ DOM を上書きしないことを確認する。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      let rejectGetProfile!: (e: Error) => void;
+      (liff.getProfile as any).mockImplementation(
+        () => new Promise<never>((_, reject) => { rejectGetProfile = reject; })
+      );
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      });
+
+      // fetch 失敗 → outer catch がすぐ返る
+      await renderUnsubscribe(container);
+      expect(container.innerHTML).toContain('ページの表示中にエラーが発生しました');
+
+      // ページ離脱
       cleanupUnsubscribeTimer();
       container.innerHTML = '<div id="other-page">別のページ</div>';
 
-      // 遅れて getProfile が成功 → outer catch の await userInfoPromise が返る
-      resolveGetProfile({ userId: mockUserId });
-      await renderPromise;
+      // 遅れて getProfile が SessionExpiredError で失敗しても別ページを上書きしない
+      (liff.getIDToken as any).mockReturnValue(null);
+      rejectGetProfile(new Error('token expired'));
+      await Promise.resolve(); // .catch ハンドラを消化
 
-      // 別ページのコンテンツが維持されている（セッション切れ UI も汎用エラーも出ない）
       expect(container.innerHTML).toContain('別のページ');
       expect(container.innerHTML).not.toContain('セッションが切れました');
-      expect(container.innerHTML).not.toContain('ページの表示中にエラーが発生しました');
     });
 
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {
@@ -506,10 +526,8 @@ describe('Unsubscribe Page', () => {
       // 第1レンダーを開始（await しない）
       const firstRender = renderUnsubscribe(container);
 
-      // マイクロタスクを消化して fetch + HTML 描画まで進める
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      // HTML が描画されるまで待つ（実装の await 段数に依存しない）
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
 
       // 第2レンダー開始（ルーターが /unsubscribe へ再遷移したケースを模擬）
       (liff.getContext as any).mockReturnValue({ userId: mockUserId });
@@ -553,10 +571,8 @@ describe('Unsubscribe Page', () => {
       // 第1レンダーを開始（await しない）
       const firstRender = renderUnsubscribe(container);
 
-      // マイクロタスクを消化して fetch + HTML 描画まで進める
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      // HTML が描画されるまで待つ（実装の await 段数に依存しない）
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
 
       // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
       cleanupUnsubscribeTimer();
@@ -590,10 +606,8 @@ describe('Unsubscribe Page', () => {
       // レンダー開始（await しない）
       const renderPromise = renderUnsubscribe(container);
 
-      // マイクロタスクを消化して fetch + HTML 描画まで進める
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      // HTML が描画されるまで待つ（実装の await 段数に依存しない）
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
 
       // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
       cleanupUnsubscribeTimer();
