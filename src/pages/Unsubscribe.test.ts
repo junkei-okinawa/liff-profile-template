@@ -302,6 +302,48 @@ describe('Unsubscribe Page', () => {
       expect(backBtn).not.toBeVisible();
     });
 
+    it('stale render: fetch failure + pending getProfile during navigation does not overwrite other page DOM', async () => {
+      // fetch が失敗した後に outer catch が await userInfoPromise を待機している間に
+      // ページ遷移が発生した場合、_renderToken ガードで別ページの DOM を上書きしないことを確認する。
+      // outer catch の await userInfoPromise 後の _renderToken チェックが有効なことを押さえる。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      // getProfile を外部から制御可能にする
+      let resolveGetProfile!: (v: { userId: string }) => void;
+      (liff.getProfile as any).mockImplementation(
+        () => new Promise<{ userId: string }>(resolve => { resolveGetProfile = resolve; })
+      );
+
+      // fetch は失敗
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      });
+
+      // レンダー開始（await しない）
+      const renderPromise = renderUnsubscribe(container);
+
+      // マイクロタスクを消化して fetch 失敗まで進める
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
+      cleanupUnsubscribeTimer();
+      container.innerHTML = '<div id="other-page">別のページ</div>';
+
+      // 遅れて getProfile が成功 → outer catch の await userInfoPromise が返る
+      resolveGetProfile({ userId: mockUserId });
+      await renderPromise;
+
+      // 別ページのコンテンツが維持されている（セッション切れ UI も汎用エラーも出ない）
+      expect(container.innerHTML).toContain('別のページ');
+      expect(container.innerHTML).not.toContain('セッションが切れました');
+      expect(container.innerHTML).not.toContain('ページの表示中にエラーが発生しました');
+    });
+
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {
       // 外部ブラウザかつ idToken は有効だが getProfile が別の理由で失敗
       (liff.getContext as any).mockReturnValue({ userId: '' });

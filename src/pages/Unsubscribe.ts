@@ -300,6 +300,11 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       userInfoError = e;
     }
 
+    // await userInfoPromise の完了後にも _renderToken を確認する。
+    // fetch 失敗後に getProfile() を待機している間にページ遷移が発生した場合、
+    // 古いレンダーが別ページの DOM をセッション切れ UI か汎用エラーで上書きしないようにする。
+    if (_renderToken !== myToken) return;
+
     if (userInfoError instanceof SessionExpiredError) {
       // showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造を作成する。
       // fetch 失敗時は HTML が未描画のため、Terms 先頭の早期チェックと同じ構造を使う。
