@@ -174,9 +174,12 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
 
   // idToken の早期チェックを通過した時点で getUserIdAndToken() も並列で開始する。
   // fetch・Markdown 変換と同時に走るため、退会ボタンが有効になるまでの待ち時間を短縮できる。
-  // fetch が失敗した場合は outer catch 内で .catch(() => {}) を呼び、
-  // unhandled rejection を防ぐ。
+  // 作成直後に .catch(() => {}) を付けて rejection handler を登録しておく。
+  // こうすることで getUserIdAndToken() が fetch 完了前に reject しても
+  // unhandledrejection にならない。実際のエラーハンドリングは HTML 描画後の
+  // try { await userInfoPromise } catch で行う（同一 Promise を複数回 await できる）。
   const userInfoPromise = getUserIdAndToken();
+  userInfoPromise.catch(() => {});
 
   try {
     const response = await fetch('/unsubscribe.md');
@@ -284,9 +287,6 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     }
 
   } catch (error: unknown) {
-    // fetch 失敗時に並列起動済みの userInfoPromise が後から reject しても
-    // unhandled rejection にならないよう握りつぶす。
-    userInfoPromise.catch(() => {});
     if (_renderToken !== myToken) return;
     console.error('Unsubscribe page error:', error);
     container.innerHTML = `<div class="container"><p style="color:red">ページの表示中にエラーが発生しました。</p></div>`;

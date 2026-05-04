@@ -236,6 +236,47 @@ describe('Unsubscribe Page', () => {
       expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
     });
 
+    it('no unhandledrejection when getUserIdAndToken rejects before markdown fetch completes', async () => {
+      // getUserIdAndToken() が fetch 完了前に reject した場合、
+      // 作成直後の .catch(() => {}) により unhandledrejection が発生しないことを確認する。
+      // 早期チェック（renderUnsubscribe 先頭）はパス、getUserIdAndToken 内で失効する状況を作る。
+      (liff.getIDToken as any)
+        .mockReturnValueOnce(mockIdToken) // renderUnsubscribe 先頭の早期チェックは通過
+        .mockReturnValue(null);           // getUserIdAndToken() 内の確認で失効を検知
+
+      // fetch は pending のまま（getUserIdAndToken が先に reject する状況）
+      let resolveFetch!: (v: object) => void;
+      (global.fetch as any).mockReturnValueOnce(
+        new Promise(resolve => { resolveFetch = resolve; })
+      );
+
+      const unhandledRejections: PromiseRejectionEvent[] = [];
+      const handler = (e: PromiseRejectionEvent) => { e.preventDefault(); unhandledRejections.push(e); };
+      window.addEventListener('unhandledrejection', handler);
+
+      // renderUnsubscribe 開始（await しない）
+      const renderPromise = renderUnsubscribe(container);
+
+      // マイクロタスクを複数回消化し、getUserIdAndToken が reject できる機会を与える
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // fetch がまだ pending の間に unhandledrejection が発生していないことを確認
+      expect(unhandledRejections).toHaveLength(0);
+
+      // fetch を完了させる
+      resolveFetch({ ok: true, text: () => Promise.resolve('# Unsubscribe Info') });
+      await renderPromise;
+
+      window.removeEventListener('unhandledrejection', handler);
+
+      // fetch 完了後、セッション切れ UI が正しく表示されている
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+      expect(container.innerHTML).toContain('セッションが切れました');
+    });
+
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {
       // 外部ブラウザかつ idToken は有効だが getProfile が別の理由で失敗
       (liff.getContext as any).mockReturnValue({ userId: '' });
