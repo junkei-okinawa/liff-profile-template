@@ -403,6 +403,42 @@ describe('Unsubscribe Page', () => {
       expect(btn).not.toBeDisabled();
     });
 
+    it('stale render: old render succeeding late does not enable button or overwrite DOM (success path guard)', async () => {
+      // 第1レンダーの getUserIdAndToken() が遅れて「成功」した場合も _renderToken ガードで DOM 更新を防ぐ。
+      // 既存テストは失敗ケースのみカバーしているため、成功経路の回帰も押さえる。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      let resolveGetProfile!: (v: { userId: string }) => void;
+      (liff.getProfile as any).mockImplementation(
+        () => new Promise<{ userId: string }>(resolve => { resolveGetProfile = resolve; })
+      );
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      // 第1レンダーを開始（await しない）
+      const firstRender = renderUnsubscribe(container);
+
+      // マイクロタスクを消化して fetch + HTML 描画まで進める
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
+      cleanupUnsubscribeTimer();
+      container.innerHTML = '<div id="other-page">別のページ</div>';
+
+      // 遅れて getProfile が「成功」→ DOM を上書きしてはいけない
+      resolveGetProfile({ userId: mockUserId });
+      await firstRender;
+
+      // 別ページのコンテンツが維持されている（退会ボタンが有効化されていない）
+      expect(container.innerHTML).toContain('別のページ');
+      expect(container.querySelector('#unsubscribe-btn')).not.toBeInTheDocument();
+    });
+
     it('cleanupUnsubscribeTimer invalidates in-progress render so stale result does not overwrite other pages', async () => {
       // ルーターがページ離脱時に cleanupUnsubscribeTimer() を呼ぶことで
       // 進行中の getUserIdAndToken() が完了しても別ページの DOM を上書きしないことを確認する。

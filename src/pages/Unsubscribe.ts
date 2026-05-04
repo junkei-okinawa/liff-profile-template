@@ -172,6 +172,12 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     return;
   }
 
+  // idToken の早期チェックを通過した時点で getUserIdAndToken() も並列で開始する。
+  // fetch・Markdown 変換と同時に走るため、退会ボタンが有効になるまでの待ち時間を短縮できる。
+  // fetch が失敗した場合は outer catch 内で .catch(() => {}) を呼び、
+  // unhandled rejection を防ぐ。
+  const userInfoPromise = getUserIdAndToken();
+
   try {
     const response = await fetch('/unsubscribe.md');
     if (!response.ok) {
@@ -219,11 +225,12 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       };
     }
 
-    // セッション確認: idToken の有効性と userId の取得可能性を検証する。
+    // 並列で開始済みの getUserIdAndToken() の結果を待つ。
+    // fetch 中にすでに完了している場合はマイクロタスク 1 つで返る。
     // userId は退会 API 実装時にボタンハンドラ内で改めて取得するため、ここでは保存しない。
     // （noUnusedLocals: true のため、実際に使うタイミングまで変数化しない。）
     try {
-      await getUserIdAndToken();
+      await userInfoPromise;
     } catch (e: unknown) {
       // 非同期処理完了後にトークンを確認する。別レンダーが始まっていれば終了する。
       if (_renderToken !== myToken) return;
@@ -277,6 +284,9 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     }
 
   } catch (error: unknown) {
+    // fetch 失敗時に並列起動済みの userInfoPromise が後から reject しても
+    // unhandled rejection にならないよう握りつぶす。
+    userInfoPromise.catch(() => {});
     if (_renderToken !== myToken) return;
     console.error('Unsubscribe page error:', error);
     container.innerHTML = `<div class="container"><p style="color:red">ページの表示中にエラーが発生しました。</p></div>`;
