@@ -302,10 +302,33 @@ describe('Unsubscribe Page', () => {
       expect(backBtn).not.toBeVisible();
     });
 
+    it('shows generic error immediately when fetch fails and getProfile is still pending (no hang)', async () => {
+      // getProfile() がハングしていても outer catch が await userInfoPromise を待たずに
+      // 汎用エラーを即時表示することを確認する。
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      // getProfile は永久に pending のまま
+      (liff.getProfile as any).mockReturnValue(new Promise(() => {}));
+
+      // fetch は失敗
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      });
+
+      await renderUnsubscribe(container);
+
+      // getProfile の完了を待たずに汎用エラーが表示されている
+      expect(container.innerHTML).toContain('ページの表示中にエラーが発生しました');
+      // セッション切れ UI は出ない（getProfile pending なので _userInfoRejection は null）
+      expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
+    });
+
     it('stale render: fetch failure + pending getProfile during navigation does not overwrite other page DOM', async () => {
-      // fetch が失敗した後に outer catch が await userInfoPromise を待機している間に
-      // ページ遷移が発生した場合、_renderToken ガードで別ページの DOM を上書きしないことを確認する。
-      // outer catch の await userInfoPromise 後の _renderToken チェックが有効なことを押さえる。
+      // fetch が失敗した後、outer catch は await Promise.resolve() 1 回だけ yield する。
+      // getProfile が pending のまま navigation が発生した場合も _renderToken ガードで
+      // 別ページの DOM を上書きしないことを確認する。
       (liff.getContext as any).mockReturnValue({ userId: '' });
 
       // getProfile を外部から制御可能にする

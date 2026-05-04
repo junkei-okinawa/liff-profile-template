@@ -174,12 +174,12 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
 
   // idToken の早期チェックを通過した時点で getUserIdAndToken() も並列で開始する。
   // fetch・Markdown 変換と同時に走るため、退会ボタンが有効になるまでの待ち時間を短縮できる。
-  // 作成直後に .catch(() => {}) を付けて rejection handler を登録しておく。
-  // こうすることで getUserIdAndToken() が fetch 完了前に reject しても
-  // unhandledrejection にならない。実際のエラーハンドリングは HTML 描画後の
-  // try { await userInfoPromise } catch で行う（同一 Promise を複数回 await できる）。
+  // reject 時は _userInfoRejection に記録し unhandledrejection も同時に抑制する。
+  // outer catch では await userInfoPromise をしない（getProfile がハングしていても
+  // fetch エラーを即時表示できるよう、マイクロタスク 1 回分だけ yield して確認する）。
+  let _userInfoRejection: unknown = null;
   const userInfoPromise = getUserIdAndToken();
-  userInfoPromise.catch(() => {});
+  userInfoPromise.catch((e) => { _userInfoRejection = e; });
 
   try {
     const response = await fetch('/unsubscribe.md');
@@ -289,25 +289,17 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
   } catch (error: unknown) {
     if (_renderToken !== myToken) return;
 
-    // fetch 失敗時も userInfoPromise の結果を確認する。
-    // getUserIdAndToken() が SessionExpiredError で失敗していた場合は
-    // fetch エラーよりもセッション切れ導線を優先する。
-    // （userInfoPromise.catch(() => {}) で unhandledrejection は既に抑制済み）
-    let userInfoError: unknown = null;
-    try {
-      await userInfoPromise;
-    } catch (e) {
-      userInfoError = e;
-    }
-
-    // await userInfoPromise の完了後にも _renderToken を確認する。
-    // fetch 失敗後に getProfile() を待機している間にページ遷移が発生した場合、
-    // 古いレンダーが別ページの DOM をセッション切れ UI か汎用エラーで上書きしないようにする。
+    // getProfile() がハングしている場合でも fetch エラーを即時表示できるよう、
+    // await userInfoPromise はしない。マイクロタスク 1 回分だけ yield して
+    // 既に settle 済みの SessionExpiredError を _userInfoRejection 経由で確認する。
+    // - userInfoPromise が既に reject 済み → _userInfoRejection に値が入っている
+    // - userInfoPromise がまだ pending    → _userInfoRejection は null のまま → 汎用エラー表示
+    await Promise.resolve();
     if (_renderToken !== myToken) return;
 
-    if (userInfoError instanceof SessionExpiredError) {
+    if (_userInfoRejection instanceof SessionExpiredError) {
       // showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造を作成する。
-      // fetch 失敗時は HTML が未描画のため、Terms 先頭の早期チェックと同じ構造を使う。
+      // fetch 失敗時は HTML が未描画のため、早期チェックと同じ構造を使う。
       container.innerHTML = `
         <div class="terms-container">
           <div id="unsubscribe-action"></div>
