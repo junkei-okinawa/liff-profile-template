@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer } from '../pages/Unsubscribe';
+import { renderUnsubscribe, renderUnsubscribeComplete, cleanupUnsubscribeTimer, USER_INFO_TIMEOUT_MS } from '../pages/Unsubscribe';
 import liff from '@line/liff';
 
 // Mock @line/liff
@@ -386,6 +386,36 @@ describe('Unsubscribe Page', () => {
 
       expect(container.innerHTML).toContain('別のページ');
       expect(container.innerHTML).not.toContain('セッションが切れました');
+    });
+
+    it('shows user info error when getProfile hangs after fetch succeeds (timeout)', async () => {
+      // getProfile() が永久に pending（ハング）した場合、USER_INFO_TIMEOUT_MS 後にタイムアウトし
+      // 「ユーザー情報の取得に失敗しました」を表示することを確認する。
+      // fetch 成功後の await userInfoPromise が無限ブロックしないことの回帰テスト。
+      vi.useFakeTimers();
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockReturnValue(new Promise(() => {})); // 永久に pending
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      const renderPromise = renderUnsubscribe(container);
+
+      // HTML が描画されるまで進める（fetch 完了 + marked.parse + DOM 描画）
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
+
+      // タイムアウトを発火させる
+      await vi.runAllTimersAsync();
+      await renderPromise;
+
+      // セッション切れ UI ではなくユーザー情報エラーが表示される
+      expect(container.innerHTML).toContain('ユーザー情報の取得に失敗しました');
+      expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
+      // 退会ボタンは有効化されない
+      const btn = container.querySelector('#unsubscribe-btn') as HTMLButtonElement | null;
+      expect(btn).toBeNull();
     });
 
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {

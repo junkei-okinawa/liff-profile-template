@@ -152,6 +152,11 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
   return { userId, idToken: freshIdToken };
 };
 
+// getUserIdAndToken() の最大待機時間（ミリ秒）。
+// fetch 成功後に await userInfoPromise で待機する際のタイムアウト値。
+// getProfile() がハングしてもこの時間を超えたらエラーを表示する。
+export const USER_INFO_TIMEOUT_MS = 10_000;
+
 // showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造。
 // 早期リターン（fetch 前）・outer catch（fetch 失敗後）の両コードパスで共用し、
 // action エリアや back ボタンの要件変更時の更新漏れを防ぐ。
@@ -235,10 +240,18 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
 
     // 並列で開始済みの getUserIdAndToken() の結果を待つ。
     // fetch 中にすでに完了している場合はマイクロタスク 1 つで返る。
+    // getProfile() がハング（resolve/reject しない）した場合でも
+    // USER_INFO_TIMEOUT_MS 以内にタイムアウトエラーを投げて確認中ループを解消する。
     // userId は退会 API 実装時にボタンハンドラ内で改めて取得するため、ここでは保存しない。
     // （noUnusedLocals: true のため、実際に使うタイミングまで変数化しない。）
+    const _timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('ユーザー情報の取得がタイムアウトしました')),
+        USER_INFO_TIMEOUT_MS
+      )
+    );
     try {
-      await userInfoPromise;
+      await Promise.race([userInfoPromise, _timeoutPromise]);
     } catch (e: unknown) {
       // 非同期処理完了後にトークンを確認する。別レンダーが始まっていれば終了する。
       if (_renderToken !== myToken) return;
