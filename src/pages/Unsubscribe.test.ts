@@ -238,8 +238,13 @@ describe('Unsubscribe Page', () => {
 
     it('no unhandledrejection when getUserIdAndToken rejects before markdown fetch completes', async () => {
       // getUserIdAndToken() が fetch 完了前に reject した場合、
-      // 作成直後の .catch(() => {}) により unhandledrejection が発生しないことを確認する。
+      // 作成直後の .catch(handler) により unhandledrejection が発生しないことを確認する。
       // 早期チェック（renderUnsubscribe 先頭）はパス、getUserIdAndToken 内で失効する状況を作る。
+      //
+      // await Promise.resolve() × N でのマイクロタスク数への依存を避けるため、
+      // fetch の解決タイミングを外部から制御して getUserIdAndToken rejection → fetch 完了
+      // の順序を保証する。getUserIdAndToken は fetch より前に Promise として起動されるため、
+      // その rejection ハンドラは fetch 解決よりも先にマイクロタスクキューに積まれる。
       (liff.getIDToken as any)
         .mockReturnValueOnce(mockIdToken) // renderUnsubscribe 先頭の早期チェックは通過
         .mockReturnValue(null);           // getUserIdAndToken() 内の確認で失効を検知
@@ -255,24 +260,20 @@ describe('Unsubscribe Page', () => {
       window.addEventListener('unhandledrejection', handler);
 
       // renderUnsubscribe 開始（await しない）
+      // この時点で getUserIdAndToken() は既に reject 済み、.catch(handler) も登録済み。
       const renderPromise = renderUnsubscribe(container);
 
-      // マイクロタスクを複数回消化し、getUserIdAndToken が reject できる機会を与える
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-
-      // fetch がまだ pending の間に unhandledrejection が発生していないことを確認
-      expect(unhandledRejections).toHaveLength(0);
-
-      // fetch を完了させる
+      // fetch を完了させて render を await する。
+      // getUserIdAndToken rejection ハンドラは fetch 解決より先にキューに積まれているため、
+      // await renderPromise の中で必ず先に実行される → unhandledrejection は発生しない。
       resolveFetch({ ok: true, text: () => Promise.resolve('# Unsubscribe Info') });
       await renderPromise;
 
       window.removeEventListener('unhandledrejection', handler);
 
-      // fetch 完了後、セッション切れ UI が正しく表示されている
+      // unhandledrejection が発生していないこと
+      expect(unhandledRejections).toHaveLength(0);
+      // fetch 完了後にセッション切れ UI が正しく表示されていること
       expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
       expect(container.innerHTML).toContain('セッションが切れました');
     });

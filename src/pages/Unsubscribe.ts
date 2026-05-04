@@ -152,6 +152,15 @@ const getUserIdAndToken = async (): Promise<{ userId: string; idToken: string }>
   return { userId, idToken: freshIdToken };
 };
 
+// showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造。
+// 早期リターン（fetch 前）・outer catch（fetch 失敗後）の両コードパスで共用し、
+// action エリアや back ボタンの要件変更時の更新漏れを防ぐ。
+const SESSION_EXPIRED_SHELL_HTML = `
+  <div class="terms-container">
+    <div id="unsubscribe-action"></div>
+    <button id="back-btn" style="display: none;"></button>
+  </div>`;
+
 export const renderUnsubscribe = async (container: HTMLElement): Promise<void> => {
   // このレンダー呼び出しのトークンを取得する。
   // 非同期処理の完了後にトークンが変わっていれば別のレンダーが始まっているため、
@@ -163,11 +172,7 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
   // fetch が失敗した場合も自動ログアウト導線に入れるよう最優先で確認する。
   // showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造を作成してから呼ぶ。
   if (!liff.getIDToken()) {
-    container.innerHTML = `
-      <div class="terms-container">
-        <div id="unsubscribe-action"></div>
-        <button id="back-btn" style="display: none;"></button>
-      </div>`;
+    container.innerHTML = SESSION_EXPIRED_SHELL_HTML;
     showSessionExpiredAndAutoLogout(container);
     return;
   }
