@@ -277,6 +277,31 @@ describe('Unsubscribe Page', () => {
       expect(container.innerHTML).toContain('セッションが切れました');
     });
 
+    it('shows session expired UI (not generic error) when getUserIdAndToken rejects with SessionExpiredError and fetch also fails', async () => {
+      // getUserIdAndToken() が SessionExpiredError で reject した後に fetch も失敗する競合ケース。
+      // outer catch が SessionExpiredError を考慮せずに汎用エラー表示に落ちる回帰を防ぐ。
+      (liff.getIDToken as any)
+        .mockReturnValueOnce(mockIdToken) // renderUnsubscribe 先頭の早期チェックは通過
+        .mockReturnValue(null);           // getUserIdAndToken() 内で失効を検知
+
+      // fetch は失敗（getUserIdAndToken が先に reject した後に fetch も落ちる状況）
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      });
+
+      await renderUnsubscribe(container);
+
+      // 汎用エラーではなくセッション切れ UI が表示される
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+      expect(container.innerHTML).toContain('セッションが切れました');
+      expect(container.innerHTML).not.toContain('ページの表示中にエラーが発生しました');
+      // 「キャンセルして戻る」ボタンが非表示になる
+      const backBtn = container.querySelector('#back-btn') as HTMLButtonElement;
+      expect(backBtn).not.toBeVisible();
+    });
+
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {
       // 外部ブラウザかつ idToken は有効だが getProfile が別の理由で失敗
       (liff.getContext as any).mockReturnValue({ userId: '' });

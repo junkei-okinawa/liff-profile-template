@@ -288,6 +288,30 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
 
   } catch (error: unknown) {
     if (_renderToken !== myToken) return;
+
+    // fetch 失敗時も userInfoPromise の結果を確認する。
+    // getUserIdAndToken() が SessionExpiredError で失敗していた場合は
+    // fetch エラーよりもセッション切れ導線を優先する。
+    // （userInfoPromise.catch(() => {}) で unhandledrejection は既に抑制済み）
+    let userInfoError: unknown = null;
+    try {
+      await userInfoPromise;
+    } catch (e) {
+      userInfoError = e;
+    }
+
+    if (userInfoError instanceof SessionExpiredError) {
+      // showSessionExpiredAndAutoLogout() が必要とする最小限の DOM 構造を作成する。
+      // fetch 失敗時は HTML が未描画のため、Terms 先頭の早期チェックと同じ構造を使う。
+      container.innerHTML = `
+        <div class="terms-container">
+          <div id="unsubscribe-action"></div>
+          <button id="back-btn" style="display: none;"></button>
+        </div>`;
+      showSessionExpiredAndAutoLogout(container);
+      return;
+    }
+
     console.error('Unsubscribe page error:', error);
     container.innerHTML = `<div class="container"><p style="color:red">ページの表示中にエラーが発生しました。</p></div>`;
   }
