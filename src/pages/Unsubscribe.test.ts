@@ -406,16 +406,50 @@ describe('Unsubscribe Page', () => {
       // HTML が描画されるまで進める（fetch 完了 + marked.parse + DOM 描画）
       await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
 
-      // タイムアウトを発火させる
-      await vi.runAllTimersAsync();
+      // USER_INFO_TIMEOUT_MS を使って明示的にタイムアウトを発火させる
+      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
       await renderPromise;
 
       // セッション切れ UI ではなくユーザー情報エラーが表示される
       expect(container.innerHTML).toContain('ユーザー情報の取得に失敗しました');
       expect(container.querySelector('[role="alert"]')).not.toBeInTheDocument();
-      // 退会ボタンは有効化されない
-      const btn = container.querySelector('#unsubscribe-btn') as HTMLButtonElement | null;
-      expect(btn).toBeNull();
+      // 退会ボタンは有効化されない（action エリアがエラーメッセージで差し替えられている）
+      expect(container.querySelector('#unsubscribe-btn')).not.toBeInTheDocument();
+    });
+
+    it('cleanupUnsubscribeTimer cancels userInfo timeout so it does not fire after navigation', async () => {
+      // getProfile() がハング中にページ離脱した場合、cleanupUnsubscribeTimer() が
+      // _userInfoTimeoutTimer を解除し、別ページ描画後にタイムアウトが発火しないことを確認する。
+      //
+      // NOTE: renderPromise を await しない理由:
+      // cleanupUnsubscribeTimer() がタイムアウトタイマーを解除すると、Promise.race の
+      // 両 Promise（getProfile 永久 pending + タイムアウト解除済み）が決着しなくなり、
+      // renderPromise は永久に pending のままになる。ページ離脱後の挙動を検証するため
+      // renderPromise は意図的に放棄し、DOM の状態のみを確認する。
+      vi.useFakeTimers();
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockReturnValue(new Promise(() => {})); // 永久に pending
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      // レンダー開始（await しない）
+      renderUnsubscribe(container);
+
+      // HTML が描画されるまで待つ
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
+
+      // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
+      cleanupUnsubscribeTimer();
+      container.innerHTML = '<div id="other-page">別のページ</div>';
+
+      // USER_INFO_TIMEOUT_MS 分進めてもタイムアウトは発火せず、別ページ DOM が保持される
+      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
+
+      expect(container.innerHTML).toContain('別のページ');
+      expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
     });
 
     it('shows user info error when context.userId is empty and getProfile fails (non-session reason)', async () => {

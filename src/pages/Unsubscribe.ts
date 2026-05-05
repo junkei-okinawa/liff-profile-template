@@ -20,6 +20,12 @@ let _autoLogoutTimer: ReturnType<typeof setTimeout> | null = null;
 // Global variable to track the interval so it can be cleaned up
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
+// getUserIdAndToken() のタイムアウトタイマーID。
+// fetch 成功後に userInfoPromise を待機する際、getProfile() がハングしても
+// USER_INFO_TIMEOUT_MS 後に自動解除するために使用する。
+// cleanupUnsubscribeTimer() でページ遷移時にも解除できるよう module スコープで保持する。
+let _userInfoTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
 // レンダートークン: renderUnsubscribe() が呼ばれるたびにインクリメントする。
 // getUserIdAndToken() 等の非同期処理が完了した時点で最新のトークンと一致するか確認し、
 // 古いレンダーの結果が新しいページの DOM を上書きするレースコンディションを防ぐ。
@@ -31,6 +37,10 @@ export const cleanupUnsubscribeTimer = (): void => {
   // 遅れて完了しても別ページの DOM を退会ページで上書きしなくなる。
   _renderToken++;
 
+  if (_userInfoTimeoutTimer !== null) {
+    clearTimeout(_userInfoTimeoutTimer);
+    _userInfoTimeoutTimer = null;
+  }
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;
@@ -192,7 +202,9 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
   userInfoPromise.catch((e) => { _userInfoRejection = e; });
 
   try {
-    const response = await fetch('/unsubscribe.md');
+    // cache: 'no-store' で LINE WebView 等のブラウザキャッシュを回避する。
+    // 退会文言を差し替えた後も古いコンテンツが表示され続けないよう terms.md と同様に設定する。
+    const response = await fetch('/unsubscribe.md', { cache: 'no-store' });
     if (!response.ok) {
       throw new Error('コンテンツの読み込みに失敗しました');
     }
@@ -244,12 +256,26 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     // USER_INFO_TIMEOUT_MS 以内にタイムアウトエラーを投げて確認中ループを解消する。
     // userId は退会 API 実装時にボタンハンドラ内で改めて取得するため、ここでは保存しない。
     // （noUnusedLocals: true のため、実際に使うタイミングまで変数化しない。）
-    const _timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error('ユーザー情報の取得がタイムアウトしました')),
+    //
+    // タイマー ID をローカル変数と module スコープの両方で保持する理由:
+    // - ローカル変数: finally で「このレンダーのタイマー」を確実に解除するため
+    // - _userInfoTimeoutTimer: cleanupUnsubscribeTimer() がページ遷移時に解除できるようにするため
+    // 複数レンダーが並走した場合、_userInfoTimeoutTimer は最新レンダーのIDで上書きされるが、
+    // ローカル変数のIDを使うことで古いレンダーのfinally が最新レンダーのタイマーを
+    // 誤って解除してしまうのを防ぐ。
+    let _localTimeoutId!: ReturnType<typeof setTimeout>;
+    const _timeoutPromise = new Promise<never>((_, reject) => {
+      _localTimeoutId = setTimeout(
+        () => {
+          if (_userInfoTimeoutTimer === _localTimeoutId) {
+            _userInfoTimeoutTimer = null;
+          }
+          reject(new Error('ユーザー情報の取得がタイムアウトしました'));
+        },
         USER_INFO_TIMEOUT_MS
-      )
-    );
+      );
+      _userInfoTimeoutTimer = _localTimeoutId;
+    });
     try {
       await Promise.race([userInfoPromise, _timeoutPromise]);
     } catch (e: unknown) {
@@ -266,6 +292,13 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
         }
       }
       return;
+    } finally {
+      // userInfoPromise の先着・タイムアウトどちらで終了した場合も、
+      // このレンダーのタイムアウトタイマーを解除する。
+      clearTimeout(_localTimeoutId);
+      if (_userInfoTimeoutTimer === _localTimeoutId) {
+        _userInfoTimeoutTimer = null;
+      }
     }
 
     // セッション確認成功。トークンを確認してから退会ボタンを有効化する。
