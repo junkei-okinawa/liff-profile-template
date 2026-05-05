@@ -426,6 +426,80 @@ describe('Unsubscribe Page', () => {
       expect(container.innerHTML).not.toContain('セッションが切れました');
     });
 
+    it('shows session expired UI when getProfile rejects with SessionExpiredError after timeout', async () => {
+      // fetch 成功後にタイムアウトしてユーザー情報エラーが表示された後、
+      // getProfile() が遅延して SessionExpiredError で失敗した場合、
+      // セッション切れ UI に更新されることを確認する（PRRT_zbRW）。
+      // fetch 失敗時の outer catch には同等の遅延ハンドラがあるが、
+      // 成功パスにはなかったため実際にはセッション切れでもエラーページに取り残されていた。
+      vi.useFakeTimers();
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      let rejectGetProfile!: (e: Error) => void;
+      (liff.getProfile as any).mockImplementation(
+        () => new Promise<never>((_, reject) => { rejectGetProfile = reject; })
+      );
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      const renderPromise = renderUnsubscribe(container);
+
+      // HTML が描画されるまで待つ
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
+
+      // タイムアウトを発火させてユーザー情報エラーを表示する
+      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
+      await renderPromise;
+      expect(container.innerHTML).toContain('ユーザー情報の取得に失敗しました');
+
+      // タイムアウト後に getProfile が SessionExpiredError で失敗
+      (liff.getIDToken as any).mockReturnValue(null);
+      rejectGetProfile(new Error('token expired after timeout'));
+
+      // セッション切れ UI に更新されるまで待つ
+      await vi.waitFor(() => expect(container.innerHTML).toContain('セッションが切れました'));
+      expect(container.querySelector('[role="alert"]')).toBeInTheDocument();
+    });
+
+    it('stale render: delayed SessionExpiredError after timeout does not overwrite navigation target', async () => {
+      // タイムアウト後にページ離脱した後、遅れた SessionExpiredError が
+      // _renderToken ガードにより別ページ DOM を上書きしないことを確認する。
+      vi.useFakeTimers();
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      let rejectGetProfile!: (e: Error) => void;
+      (liff.getProfile as any).mockImplementation(
+        () => new Promise<never>((_, reject) => { rejectGetProfile = reject; })
+      );
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      const renderPromise = renderUnsubscribe(container);
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
+
+      // タイムアウトを発火させてユーザー情報エラーを表示する
+      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
+      await renderPromise;
+
+      // ページ離脱
+      cleanupUnsubscribeTimer();
+      container.innerHTML = '<div id="other-page">別のページ</div>';
+
+      // 遅れて getProfile が SessionExpiredError で失敗しても別ページを上書きしない
+      (liff.getIDToken as any).mockReturnValue(null);
+      rejectGetProfile(new Error('token expired'));
+      await Promise.resolve();
+
+      expect(container.innerHTML).toContain('別のページ');
+      expect(container.innerHTML).not.toContain('セッションが切れました');
+    });
+
     it('shows user info error when getProfile hangs after fetch succeeds (timeout)', async () => {
       // getProfile() が永久に pending（ハング）した場合、USER_INFO_TIMEOUT_MS 後にタイムアウトし
       // 「ユーザー情報の取得に失敗しました」を表示することを確認する。

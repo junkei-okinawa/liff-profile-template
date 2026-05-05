@@ -308,6 +308,15 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
         if (unsubscribeAction) {
           unsubscribeAction.innerHTML = '<p style="color: red;">ユーザー情報の取得に失敗しました。</p>';
         }
+        // タイムアウト後に getProfile() が遅延して SessionExpiredError で失敗した場合も対応する。
+        // fetch 失敗時の outer catch と同等のパターンを成功パスにも適用する（PRRT_zbRW）。
+        // fetch 成功後は HTML が描画済みのため SESSION_EXPIRED_SHELL_HTML は不要。
+        // _renderToken === myToken ガードで別ページ遷移後の更新を防ぐ。
+        userInfoPromise.catch((err) => {
+          if (err instanceof SessionExpiredError && _renderToken === myToken) {
+            showSessionExpiredAndAutoLogout(container);
+          }
+        });
       }
       return;
     } finally {
