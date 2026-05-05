@@ -20,11 +20,12 @@ let _autoLogoutTimer: ReturnType<typeof setTimeout> | null = null;
 // Global variable to track the interval so it can be cleaned up
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
-// getUserIdAndToken() のタイムアウトタイマーID。
-// fetch 成功後に userInfoPromise を待機する際、getProfile() がハングしても
-// USER_INFO_TIMEOUT_MS 後に自動解除するために使用する。
-// cleanupUnsubscribeTimer() でページ遷移時にも解除できるよう module スコープで保持する。
-let _userInfoTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+// 進行中のレンダーをキャンセルするための reject 関数セット。
+// cleanupUnsubscribeTimer() がページ離脱時に全レンダーの Promise.race を
+// 即時 settle させ、getProfile() ハング等による未解決 Promise の蓄積を防ぐ。
+// モジュールスコープの変数1つで「最新レンダーのタイマーのみ管理」していた旧実装は
+// 並走レンダーで古いタイマーが取り残される問題があったため、セットに切り替えた。
+const _pendingCancels = new Set<(err: Error) => void>();
 
 // レンダートークン: renderUnsubscribe() が呼ばれるたびにインクリメントする。
 // getUserIdAndToken() 等の非同期処理が完了した時点で最新のトークンと一致するか確認し、
@@ -37,10 +38,14 @@ export const cleanupUnsubscribeTimer = (): void => {
   // 遅れて完了しても別ページの DOM を退会ページで上書きしなくなる。
   _renderToken++;
 
-  if (_userInfoTimeoutTimer !== null) {
-    clearTimeout(_userInfoTimeoutTimer);
-    _userInfoTimeoutTimer = null;
+  // 全進行中レンダーのキャンセル Promise を reject して Promise.race を即時 settle させる。
+  // これにより getProfile() ハング中でも全レンダーが確実に終了し、
+  // stale なタイムアウトタイマーや未解決 Promise が残らなくなる。
+  for (const cancel of _pendingCancels) {
+    cancel(new Error('RENDER_CANCELLED'));
   }
+  _pendingCancels.clear();
+
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;
@@ -253,33 +258,41 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     // 並列で開始済みの getUserIdAndToken() の結果を待つ。
     // fetch 中にすでに完了している場合はマイクロタスク 1 つで返る。
     // getProfile() がハング（resolve/reject しない）した場合でも
-    // USER_INFO_TIMEOUT_MS 以内にタイムアウトエラーを投げて確認中ループを解消する。
+    // USER_INFO_TIMEOUT_MS 以内にタイムアウト、またはページ離脱時のキャンセルで確実に終了する。
     // userId は退会 API 実装時にボタンハンドラ内で改めて取得するため、ここでは保存しない。
     // （noUnusedLocals: true のため、実際に使うタイミングまで変数化しない。）
     //
-    // タイマー ID をローカル変数と module スコープの両方で保持する理由:
-    // - ローカル変数: finally で「このレンダーのタイマー」を確実に解除するため
-    // - _userInfoTimeoutTimer: cleanupUnsubscribeTimer() がページ遷移時に解除できるようにするため
-    // 複数レンダーが並走した場合、_userInfoTimeoutTimer は最新レンダーのIDで上書きされるが、
-    // ローカル変数のIDを使うことで古いレンダーのfinally が最新レンダーのタイマーを
-    // 誤って解除してしまうのを防ぐ。
+    // Promise.race に3つの Promise を渡す:
+    // 1. userInfoPromise: getUserIdAndToken() の正常完了 or エラー
+    // 2. _timeoutPromise: USER_INFO_TIMEOUT_MS 後に reject（ハング防止）
+    // 3. _cancelPromise: cleanupUnsubscribeTimer() 呼び出し時に即時 reject（ページ離脱対応）
+    //
+    // キャンセルのアーキテクチャ:
+    // - module スコープの _userInfoTimeoutTimer で「最新1件のタイマーのみ管理」する旧方式は、
+    //   並走レンダーで古いタイマーが取り残される問題があった（PRRT_gduV）。
+    // - cleanupUnsubscribeTimer() でタイマー解除だけでは Promise.race が永久 pending になる問題もあった（PRRT_gdt-）。
+    // - _pendingCancels セットで全レンダーを管理し、離脱時に一括 reject することで両問題を解決する。
+    let _cancelReject!: (err: Error) => void;
+    const _cancelPromise = new Promise<never>((_, reject) => {
+      _cancelReject = reject;
+    });
+    // _cancelPromise 自体の reject を購読しておかないと unhandledrejection になる。
+    // 実際のエラーハンドリングは Promise.race の catch 側で行う。
+    _cancelPromise.catch(() => {});
+    _pendingCancels.add(_cancelReject);
+
     let _localTimeoutId!: ReturnType<typeof setTimeout>;
     const _timeoutPromise = new Promise<never>((_, reject) => {
       _localTimeoutId = setTimeout(
-        () => {
-          if (_userInfoTimeoutTimer === _localTimeoutId) {
-            _userInfoTimeoutTimer = null;
-          }
-          reject(new Error('ユーザー情報の取得がタイムアウトしました'));
-        },
+        () => reject(new Error('ユーザー情報の取得がタイムアウトしました')),
         USER_INFO_TIMEOUT_MS
       );
-      _userInfoTimeoutTimer = _localTimeoutId;
     });
     try {
-      await Promise.race([userInfoPromise, _timeoutPromise]);
+      await Promise.race([userInfoPromise, _timeoutPromise, _cancelPromise]);
     } catch (e: unknown) {
-      // 非同期処理完了後にトークンを確認する。別レンダーが始まっていれば終了する。
+      // キャンセル（_cancelPromise）または別レンダー開始の場合は静かに終了する。
+      // DOM 更新せずに return することで、別ページや新レンダーの表示を守る。
       if (_renderToken !== myToken) return;
       const isSessionExpired = e instanceof SessionExpiredError;
       if (isSessionExpired) {
@@ -293,12 +306,10 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       }
       return;
     } finally {
-      // userInfoPromise の先着・タイムアウトどちらで終了した場合も、
-      // このレンダーのタイムアウトタイマーを解除する。
+      // 正常完了・タイムアウト・キャンセルのいずれの場合も、
+      // このレンダーのタイムアウトタイマーを解除し、_pendingCancels から登録を削除する。
       clearTimeout(_localTimeoutId);
-      if (_userInfoTimeoutTimer === _localTimeoutId) {
-        _userInfoTimeoutTimer = null;
-      }
+      _pendingCancels.delete(_cancelReject);
     }
 
     // セッション確認成功。トークンを確認してから退会ボタンを有効化する。

@@ -417,15 +417,11 @@ describe('Unsubscribe Page', () => {
       expect(container.querySelector('#unsubscribe-btn')).not.toBeInTheDocument();
     });
 
-    it('cleanupUnsubscribeTimer cancels userInfo timeout so it does not fire after navigation', async () => {
+    it('cleanupUnsubscribeTimer cancels pending render via cancel Promise so renderPromise settles', async () => {
       // getProfile() がハング中にページ離脱した場合、cleanupUnsubscribeTimer() が
-      // _userInfoTimeoutTimer を解除し、別ページ描画後にタイムアウトが発火しないことを確認する。
-      //
-      // NOTE: renderPromise を await しない理由:
-      // cleanupUnsubscribeTimer() がタイムアウトタイマーを解除すると、Promise.race の
-      // 両 Promise（getProfile 永久 pending + タイムアウト解除済み）が決着しなくなり、
-      // renderPromise は永久に pending のままになる。ページ離脱後の挙動を検証するため
-      // renderPromise は意図的に放棄し、DOM の状態のみを確認する。
+      // _cancelPromise を reject して Promise.race を即時 settle させ、
+      // renderPromise が永久 pending にならないことを確認する。
+      // 旧実装は「タイムアウトタイマー解除のみ」で Promise.race が決着しない問題があった（PRRT_gdt-）。
       vi.useFakeTimers();
       (liff.getContext as any).mockReturnValue({ userId: '' });
       (liff.getProfile as any).mockReturnValue(new Promise(() => {})); // 永久に pending
@@ -435,19 +431,67 @@ describe('Unsubscribe Page', () => {
         text: () => Promise.resolve('# Unsubscribe Info'),
       });
 
-      // レンダー開始（await しない）
-      renderUnsubscribe(container);
+      const renderPromise = renderUnsubscribe(container);
 
       // HTML が描画されるまで待つ
       await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
 
-      // ページ離脱: ルーターが cleanupUnsubscribeTimer() を呼び、別ページを描画する
+      // ページ離脱: cleanupUnsubscribeTimer() が _cancelPromise を reject して Promise.race を settle させる
       cleanupUnsubscribeTimer();
       container.innerHTML = '<div id="other-page">別のページ</div>';
 
-      // USER_INFO_TIMEOUT_MS 分進めてもタイムアウトは発火せず、別ページ DOM が保持される
-      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
+      // renderPromise が確実に settle することを確認（タイムアウトを待たずに終了）
+      await renderPromise;
 
+      // 別ページのコンテンツが維持されている（キャンセルで DOM 更新されない）
+      expect(container.innerHTML).toContain('別のページ');
+      expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
+
+      // タイムアウトタイマーが解除されていることを確認（USER_INFO_TIMEOUT_MS 分進めても発火しない）
+      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
+      expect(container.innerHTML).toContain('別のページ');
+    });
+
+    it('cleanupUnsubscribeTimer cancels all concurrent renders (not just the latest timer)', async () => {
+      // 旧実装の問題: _userInfoTimeoutTimer を 1 変数で管理すると、
+      // レンダー2 開始時にレンダー1 のタイマー ID が上書きされ、
+      // cleanup 後もレンダー1 の 10 秒タイマーが生き残る（PRRT_gduV）。
+      // 新実装: _pendingCancels セットで全レンダーを管理し一括キャンセルする。
+      vi.useFakeTimers();
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (liff.getProfile as any).mockReturnValue(new Promise(() => {}));
+
+      // レンダー1 のフェッチ
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      // レンダー1 開始
+      const render1 = renderUnsubscribe(container);
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
+
+      // レンダー2 のフェッチ（別の getContext モック）
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Unsubscribe Info'),
+      });
+
+      // レンダー2 開始（レンダー1 は getProfile ハング中のまま）
+      const render2 = renderUnsubscribe(container);
+      await vi.waitFor(() => expect(container.querySelector('#unsubscribe-btn')).toBeInTheDocument());
+
+      // ページ離脱: 両レンダーが cancel される
+      cleanupUnsubscribeTimer();
+      container.innerHTML = '<div id="other-page">別のページ</div>';
+
+      // 両レンダーが settle することを確認（render1 のタイマーも残らない）
+      await render1;
+      await render2;
+
+      // USER_INFO_TIMEOUT_MS 分進めても DOM は変わらない（タイマーが全解除されている）
+      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
       expect(container.innerHTML).toContain('別のページ');
       expect(container.innerHTML).not.toContain('ユーザー情報の取得に失敗しました');
     });
