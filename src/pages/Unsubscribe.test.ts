@@ -303,6 +303,45 @@ describe('Unsubscribe Page', () => {
       expect(backBtn).not.toBeVisible();
     });
 
+    it('cleanupUnsubscribeTimer cancels pending getProfile even when fetch fails (covers fetch-failure path)', async () => {
+      // fetch 失敗パスで getProfile() がハングしているとき、cleanupUnsubscribeTimer() が
+      // _cancelPromise 経由で userInfoPromise を settle させることを確認する（PRRT_gxXA）。
+      // 旧実装では _cancelPromise が fetch 成功後にのみ作成されるため、
+      // fetch 失敗パスでは cleanupUnsubscribeTimer() が getProfile() ハングを解除できなかった。
+      vi.useFakeTimers();
+      (liff.getContext as any).mockReturnValue({ userId: '' });
+
+      let resolveUserInfoAfterCleanup!: () => void;
+      // getProfile は永久に pending のまま
+      (liff.getProfile as any).mockReturnValue(new Promise(() => {}));
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      });
+
+      // render 開始（await しない: outer catch が返った後も getProfile が pending）
+      const renderPromise = renderUnsubscribe(container);
+
+      // fetch 失敗 → outer catch が汎用エラーを表示して return する
+      // （getProfile は pending のまま）
+      resolveUserInfoAfterCleanup = () => {}; // placeholder
+
+      await renderPromise;
+      expect(container.innerHTML).toContain('ページの表示中にエラーが発生しました');
+
+      // ページ離脱: cleanupUnsubscribeTimer() が _cancelPromise を reject し
+      // fetch 失敗パスの userInfoPromise も settle する
+      cleanupUnsubscribeTimer();
+      container.innerHTML = '<div id="other-page">別のページ</div>';
+
+      // USER_INFO_TIMEOUT_MS 分進めても DOM は変わらない（cancel が成功している）
+      await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
+      expect(container.innerHTML).toContain('別のページ');
+      expect(container.innerHTML).not.toContain('ページの表示中にエラーが発生しました');
+    });
+
     it('shows generic error immediately when fetch fails and getProfile is still pending (no hang)', async () => {
       // getProfile() がハングしていても outer catch が await userInfoPromise を待たずに
       // 汎用エラーを即時表示することを確認する。

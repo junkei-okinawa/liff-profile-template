@@ -197,13 +197,23 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     return;
   }
 
+  // キャンセル機構を getUserIdAndToken() より先に作成する。
+  // fetch 失敗パスでも getProfile() ハングを cleanupUnsubscribeTimer() でキャンセルできるよう、
+  // _cancelPromise を userInfoPromise に組み込んでおく（PRRT_gxXA）。
+  let _cancelReject!: (err: Error) => void;
+  const _cancelPromise = new Promise<never>((_, reject) => { _cancelReject = reject; });
+  // _cancelPromise 自体の reject を購読しておかないと unhandledrejection になる。
+  _cancelPromise.catch(() => {});
+  _pendingCancels.add(_cancelReject);
+
   // idToken の早期チェックを通過した時点で getUserIdAndToken() も並列で開始する。
   // fetch・Markdown 変換と同時に走るため、退会ボタンが有効になるまでの待ち時間を短縮できる。
+  // _cancelPromise と race させることで fetch 失敗パスでも getProfile() ハングがキャンセルされる。
   // reject 時は _userInfoRejection に記録し unhandledrejection も同時に抑制する。
   // outer catch では await userInfoPromise をしない（getProfile がハングしていても
   // fetch エラーを即時表示できるよう、マイクロタスク 1 回分だけ yield して確認する）。
   let _userInfoRejection: unknown = null;
-  const userInfoPromise = getUserIdAndToken();
+  const userInfoPromise = Promise.race([getUserIdAndToken(), _cancelPromise]);
   userInfoPromise.catch((e) => { _userInfoRejection = e; });
 
   try {
@@ -262,25 +272,11 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
     // userId は退会 API 実装時にボタンハンドラ内で改めて取得するため、ここでは保存しない。
     // （noUnusedLocals: true のため、実際に使うタイミングまで変数化しない。）
     //
-    // Promise.race に3つの Promise を渡す:
-    // 1. userInfoPromise: getUserIdAndToken() の正常完了 or エラー
-    // 2. _timeoutPromise: USER_INFO_TIMEOUT_MS 後に reject（ハング防止）
-    // 3. _cancelPromise: cleanupUnsubscribeTimer() 呼び出し時に即時 reject（ページ離脱対応）
-    //
-    // キャンセルのアーキテクチャ:
-    // - module スコープの _userInfoTimeoutTimer で「最新1件のタイマーのみ管理」する旧方式は、
-    //   並走レンダーで古いタイマーが取り残される問題があった（PRRT_gduV）。
-    // - cleanupUnsubscribeTimer() でタイマー解除だけでは Promise.race が永久 pending になる問題もあった（PRRT_gdt-）。
-    // - _pendingCancels セットで全レンダーを管理し、離脱時に一括 reject することで両問題を解決する。
-    let _cancelReject!: (err: Error) => void;
-    const _cancelPromise = new Promise<never>((_, reject) => {
-      _cancelReject = reject;
-    });
-    // _cancelPromise 自体の reject を購読しておかないと unhandledrejection になる。
-    // 実際のエラーハンドリングは Promise.race の catch 側で行う。
-    _cancelPromise.catch(() => {});
-    _pendingCancels.add(_cancelReject);
-
+    // Promise.race に渡す:
+    // - userInfoPromise: getUserIdAndToken() の完了 or エラー（_cancelPromise 既内包）
+    // - _timeoutPromise: USER_INFO_TIMEOUT_MS 後に reject（ハング防止）
+    // _cancelPromise は userInfoPromise に組み込み済みのため別途渡す必要はない。
+    // _pendingCancels.delete は外側の finally に移譲。
     let _localTimeoutId!: ReturnType<typeof setTimeout>;
     const _timeoutPromise = new Promise<never>((_, reject) => {
       _localTimeoutId = setTimeout(
@@ -289,9 +285,10 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       );
     });
     try {
-      await Promise.race([userInfoPromise, _timeoutPromise, _cancelPromise]);
+      await Promise.race([userInfoPromise, _timeoutPromise]);
     } catch (e: unknown) {
-      // キャンセル（_cancelPromise）または別レンダー開始の場合は静かに終了する。
+      // キャンセル（userInfoPromise 内包の _cancelPromise 経由）または
+      // 別レンダー開始の場合は静かに終了する。
       // DOM 更新せずに return することで、別ページや新レンダーの表示を守る。
       if (_renderToken !== myToken) return;
       const isSessionExpired = e instanceof SessionExpiredError;
@@ -307,9 +304,9 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
       return;
     } finally {
       // 正常完了・タイムアウト・キャンセルのいずれの場合も、
-      // このレンダーのタイムアウトタイマーを解除し、_pendingCancels から登録を削除する。
+      // タイムアウトタイマーを解除する。
+      // _pendingCancels.delete は外側の finally で行う。
       clearTimeout(_localTimeoutId);
-      _pendingCancels.delete(_cancelReject);
     }
 
     // セッション確認成功。トークンを確認してから退会ボタンを有効化する。
@@ -380,6 +377,10 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
         showSessionExpiredAndAutoLogout(container);
       }
     });
+  } finally {
+    // fetch 成功・失敗・キャンセルのすべてのパスでこのレンダーの cancel 登録を削除する。
+    // fetch 失敗パスでも _cancelReject が _pendingCancels に残らないよう保証する。
+    _pendingCancels.delete(_cancelReject);
   }
 };
 
