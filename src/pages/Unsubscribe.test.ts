@@ -304,14 +304,17 @@ describe('Unsubscribe Page', () => {
     });
 
     it('cleanupUnsubscribeTimer cancels pending getProfile even when fetch fails (covers fetch-failure path)', async () => {
-      // fetch 失敗パスで getProfile() がハングしているとき、cleanupUnsubscribeTimer() が
-      // _cancelPromise 経由で userInfoPromise を settle させることを確認する（PRRT_gxXA）。
-      // 旧実装では _cancelPromise が fetch 成功後にのみ作成されるため、
-      // fetch 失敗パスでは cleanupUnsubscribeTimer() が getProfile() ハングを解除できなかった。
+      // fetch 失敗パスで renderUnsubscribe() が return した後も getProfile() がハングしているとき、
+      // cleanupUnsubscribeTimer() が _cancelPromise 経由で userInfoPromise を settle させることを確認する。
+      //
+      // 旧実装の問題（PRRT_pdLR）:
+      //   outer finally で _cancelReject を削除すると renderUnsubscribe() return 時点で削除され、
+      //   その後の cleanupUnsubscribeTimer() でキャンセルできなくなっていた。
+      // 新実装:
+      //   _pendingCancels.delete を userInfoPromise.catch().finally() チェーンに移し、
+      //   Promise が settle した時点で削除するため pending 中は常にキャンセル可能。
       vi.useFakeTimers();
       (liff.getContext as any).mockReturnValue({ userId: '' });
-
-      let resolveUserInfoAfterCleanup!: () => void;
       // getProfile は永久に pending のまま
       (liff.getProfile as any).mockReturnValue(new Promise(() => {}));
 
@@ -321,22 +324,18 @@ describe('Unsubscribe Page', () => {
         statusText: 'Service Unavailable',
       });
 
-      // render 開始（await しない: outer catch が返った後も getProfile が pending）
+      // renderUnsubscribe を await する（fetch 失敗 → outer catch が汎用エラーを表示して return）
+      // この時点で getProfile はまだ pending のまま
       const renderPromise = renderUnsubscribe(container);
-
-      // fetch 失敗 → outer catch が汎用エラーを表示して return する
-      // （getProfile は pending のまま）
-      resolveUserInfoAfterCleanup = () => {}; // placeholder
-
       await renderPromise;
       expect(container.innerHTML).toContain('ページの表示中にエラーが発生しました');
 
-      // ページ離脱: cleanupUnsubscribeTimer() が _cancelPromise を reject し
-      // fetch 失敗パスの userInfoPromise も settle する
+      // ページ離脱: renderUnsubscribe() return 後も _cancelReject が _pendingCancels に残っているため、
+      // cleanupUnsubscribeTimer() が _cancelPromise を reject して userInfoPromise を settle できる
       cleanupUnsubscribeTimer();
       container.innerHTML = '<div id="other-page">別のページ</div>';
 
-      // USER_INFO_TIMEOUT_MS 分進めても DOM は変わらない（cancel が成功している）
+      // USER_INFO_TIMEOUT_MS 分進めても DOM は変わらない（cancel が成功しタイマーが残っていない）
       await vi.advanceTimersByTimeAsync(USER_INFO_TIMEOUT_MS);
       expect(container.innerHTML).toContain('別のページ');
       expect(container.innerHTML).not.toContain('ページの表示中にエラーが発生しました');

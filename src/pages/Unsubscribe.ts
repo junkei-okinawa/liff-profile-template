@@ -212,9 +212,17 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
   // reject 時は _userInfoRejection に記録し unhandledrejection も同時に抑制する。
   // outer catch では await userInfoPromise をしない（getProfile がハングしていても
   // fetch エラーを即時表示できるよう、マイクロタスク 1 回分だけ yield して確認する）。
+  //
+  // _pendingCancels.delete を .finally() で登録する理由:
+  // outer try/finally で削除すると renderUnsubscribe() が return した時点で削除されてしまい、
+  // userInfoPromise（getProfile ハング中）が pending のまま残っていても
+  // その後の cleanupUnsubscribeTimer() でキャンセルできなくなる（PRRT_pdLR）。
+  // Promise が settle した時点で削除することで、pending 中は常にキャンセル可能になる。
   let _userInfoRejection: unknown = null;
   const userInfoPromise = Promise.race([getUserIdAndToken(), _cancelPromise]);
-  userInfoPromise.catch((e) => { _userInfoRejection = e; });
+  userInfoPromise
+    .catch((e) => { _userInfoRejection = e; })
+    .finally(() => { _pendingCancels.delete(_cancelReject); });
 
   try {
     // cache: 'no-store' で LINE WebView 等のブラウザキャッシュを回避する。
@@ -377,10 +385,6 @@ export const renderUnsubscribe = async (container: HTMLElement): Promise<void> =
         showSessionExpiredAndAutoLogout(container);
       }
     });
-  } finally {
-    // fetch 成功・失敗・キャンセルのすべてのパスでこのレンダーの cancel 登録を削除する。
-    // fetch 失敗パスでも _cancelReject が _pendingCancels に残らないよう保証する。
-    _pendingCancels.delete(_cancelReject);
   }
 };
 
