@@ -420,10 +420,13 @@ describe('Unsubscribe Page', () => {
       // 遅れて getProfile が SessionExpiredError で失敗しても別ページを上書きしない
       (liff.getIDToken as any).mockReturnValue(null);
       rejectGetProfile(new Error('token expired'));
-      await Promise.resolve(); // .catch ハンドラを消化
 
-      expect(container.innerHTML).toContain('別のページ');
-      expect(container.innerHTML).not.toContain('セッションが切れました');
+      // waitFor でイベントループに処理を譲り、遅延 .catch ハンドラが発火した後も
+      // DOM が変化していないことを観測可能な状態として確認する。
+      await vi.waitFor(() => {
+        expect(container.innerHTML).toContain('別のページ');
+        expect(container.innerHTML).not.toContain('セッションが切れました');
+      });
     });
 
     it('shows session expired UI when getProfile rejects with SessionExpiredError after timeout', async () => {
@@ -494,10 +497,13 @@ describe('Unsubscribe Page', () => {
       // 遅れて getProfile が SessionExpiredError で失敗しても別ページを上書きしない
       (liff.getIDToken as any).mockReturnValue(null);
       rejectGetProfile(new Error('token expired'));
-      await Promise.resolve();
 
-      expect(container.innerHTML).toContain('別のページ');
-      expect(container.innerHTML).not.toContain('セッションが切れました');
+      // waitFor でイベントループに処理を譲り、遅延 .catch ハンドラが発火した後も
+      // DOM が変化していないことを観測可能な状態として確認する。
+      await vi.waitFor(() => {
+        expect(container.innerHTML).toContain('別のページ');
+        expect(container.innerHTML).not.toContain('セッションが切れました');
+      });
     });
 
     it('shows user info error when getProfile hangs after fetch succeeds (timeout)', async () => {
