@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import liff from '@line/liff';
 import { config } from '../config';
 import { TERMS_UPDATED_AT } from '../shared-constants';
+import { buildSessionExpiredHtml } from '../utils/session-ui';
 
 // module スコープで 401 自動ログアウトタイマーIDを保持する。
 // ページ遷移時にルーターから cleanupTermsAutoLogoutTimer() を呼ぶことで
@@ -79,21 +80,12 @@ export const renderTerms = async (container: HTMLElement): Promise<void> => {
     }
 };
 
-// セッション切れメッセージとログアウトボタンの HTML を生成する純粋関数。
-// 上部バナー・下部エリアで共用し、文言・ボタンスタイルの変更を一箇所に集約する。
-const buildSessionExpiredHtml = (btnId: string): string => `
-    <p style="color: #e65c00; font-weight: bold; margin: 0 0 6px;">セッションが切れました。</p>
-    <p style="color: #666; font-size: 0.9rem; margin: 0 0 10px;">3秒後に自動ログアウトします。再ログインしてください。</p>
-    <button id="${btnId}" style="padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 0.9rem; cursor: pointer;">
-        今すぐログアウト
-    </button>
-`;
-
 // GET /status・POST /agreement 両方の 401 で使う共通 UI 表示関数。
 // - ページ最上部に sticky バナーを追加し、スクロール位置に関わらずセッション切れを即座に通知
 // - role="alert" aria-live="assertive" は上部バナーのみ付与し、スクリーンリーダーへの重複通知を避ける
 // - 「プロフィールに戻る」ボタンを非表示にして期限切れセッションのまま遷移を防ぐ
 // - 3秒後に自動ログアウト（module スコープタイマーで cleanup 可能）
+// - hasLoggedOut ガードでタイマー満了・上部ボタン・下部ボタンの同時実行による二重実行を防止
 const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: HTMLElement): void => {
     // 401 時は戻る導線を塞ぎ、期限切れセッションのまま Profile に戻れないようにする
     const backBtn = container.querySelector('#back-btn') as HTMLButtonElement | null;
@@ -118,7 +110,21 @@ const showSessionExpiredAndAutoLogout = (agreementSection: Element, container: H
     // 最下部の同意エリアも同じメッセージで更新し、下まで読んだユーザーにも通知する
     agreementSection.innerHTML = buildSessionExpiredHtml('session-logout-btn');
 
+    // agreementSection の innerHTML 差し替えでフォーカスが失われるため、
+    // キーボード操作・支援技術の利用者が次の操作先を見失わないようフォーカスを移す。
+    // 下部ボタンへの focus() は長い Terms コンテンツ末尾まで自動スクロールを引き起こすため、
+    // 常にビューポート上部に表示されている sticky バナーのボタンへフォーカスする。
+    const topLogoutBtnFocus = container.querySelector<HTMLButtonElement>('#session-logout-btn-top');
+    if (topLogoutBtnFocus) {
+        topLogoutBtnFocus.focus();
+    }
+
+    // タイマー満了・上部ボタン・下部ボタンが重なっても liff.logout() と
+    // href='/' が二重実行されないよう hasLoggedOut フラグでガードする。
+    let hasLoggedOut = false;
     const doLogout = () => {
+        if (hasLoggedOut) return;
+        hasLoggedOut = true;
         if (liff.isLoggedIn()) {
             liff.logout();
         }

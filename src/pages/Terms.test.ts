@@ -374,6 +374,31 @@ describe('Terms Page', () => {
     expect(window.location.href).toBe('/');
   });
 
+  it('401: session expired UI moves focus to sticky top banner logout button for keyboard/a11y users', async () => {
+    // agreementSection の innerHTML 差し替え後、フォーカスが sticky 上部バナーの
+    // #session-logout-btn-top へ移動することを確認する。
+    // 下部の #session-logout-btn へのフォーカスは長い利用規約コンテンツの末尾へ自動スクロールを
+    // 引き起こすため、常にビューポート上部に表示されている上部バナーのボタンへフォーカスする。
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+    await renderTerms(container);
+
+    const topLogoutBtn = container.querySelector('#session-logout-btn-top') as HTMLButtonElement;
+    expect(topLogoutBtn).toBeInTheDocument();
+    expect(topLogoutBtn).toHaveFocus();
+    // 下部ボタンも存在するが、フォーカスは上部バナーに移動している
+    expect(container.querySelector('#session-logout-btn')).toBeInTheDocument();
+  });
+
   it('401: auto-logout fires after 3 seconds when button not clicked', async () => {
     vi.useFakeTimers();
     (global.fetch as any)
@@ -522,6 +547,36 @@ describe('Terms Page', () => {
     expect(container.querySelector('#session-logout-btn-top')).not.toBeInTheDocument();
     // 通常の同意ボタンは表示される
     expect(container.querySelector('#agree-btn')).toBeInTheDocument();
+  });
+
+  it('401: doLogout is not called twice when timer fires and top/bottom buttons clicked simultaneously', async () => {
+    // Terms には上部・下部の 2 ボタンがあるため、タイマー満了＋ボタン連打でも
+    // liff.logout() が二重実行されないことを確認する
+    vi.useFakeTimers();
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+    (liff.isLoggedIn as any).mockReturnValue(true);
+
+    await renderTerms(container);
+
+    // タイマー満了 → doLogout() 1回目
+    vi.advanceTimersByTime(3000);
+    expect(liff.logout).toHaveBeenCalledTimes(1);
+
+    // 上部ボタン・下部ボタン連打 → hasLoggedOut ガードで skip
+    const topBtn = container.querySelector('#session-logout-btn-top') as HTMLButtonElement;
+    const bottomBtn = container.querySelector('#session-logout-btn') as HTMLButtonElement;
+    topBtn.click();
+    bottomBtn.click();
+    expect(liff.logout).toHaveBeenCalledTimes(1); // 重複しない
   });
 
   it('back button navigates to profile page via replaceState', async () => {
