@@ -168,6 +168,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
     let userId = '';
     let hasAgreed = false;
     let isReconsent = false;
+    let hasAgeVerified = false;
 
     try {
         if (liff.isInClient() || liff.isLoggedIn()) {
@@ -237,44 +238,90 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             hasAgreed = false;
         }
 
+        // age_verified_at が設定済みであれば年齢確認済みとみなす（一度確認すれば以降不要）
+        hasAgeVerified = !!statusData.ageVerifiedAt;
+
     } catch (e) {
         console.error('API check failed', e);
-        // hasAgreed is initialized to false, so no need to set it here if we return early
         const agreementSection = container.querySelector('#agreement-section');
         if (agreementSection) {
             agreementSection.innerHTML = `<p style="color: red;">同意状況の確認中にエラーが発生しました。</p>`;
         }
-        return; // Exit early if there's an error
+        return;
     }
+
+    const needsTerms = !hasAgreed;
+    const needsAge = !hasAgeVerified;
 
     const agreementSection = container.querySelector('#agreement-section');
     if (agreementSection) {
-        if (hasAgreed) {
-            agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意済みです</p>';
+        if (!needsTerms && !needsAge) {
+            agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意・年齢確認済みです</p>';
         } else {
-            const btnLabel = isReconsent ? '更新された規約に同意する' : '規約に同意する';
-            const notice = isReconsent
-                ? '<p style="color: #e65c00; font-weight: bold; margin-bottom: 8px;">利用規約が更新されました。引き続きご利用いただくには再度ご同意ください。</p>'
-                : '';
-            // userId is guaranteed to be present here due to validation above
-            agreementSection.innerHTML = `
-          ${notice}
-          <button id="agree-btn" style="padding: 12px 24px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-bottom: 10px;">
-            ${btnLabel}
-          </button>
-        `;
+            // 通知メッセージの構築
+            let noticeHtml = '';
+            if (isReconsent) {
+                noticeHtml += '<p style="color: #e65c00; font-weight: bold; margin-bottom: 8px;">利用規約が更新されました。引き続きご利用いただくには再度ご同意ください。</p>';
+            }
+            if (!needsTerms && needsAge) {
+                // 利用規約は同意済みだが年齢確認が未完了（機能追加前の既存ユーザー等）
+                noticeHtml += '<p style="color: #e65c00; font-weight: bold; margin-bottom: 8px;">年齢確認が必要です。本サービスは18歳以上の方を対象としています。</p>';
+            }
 
-            const agreeBtn = document.getElementById('agree-btn');
+            // 年齢確認チェックボックス（年齢未確認の場合のみ表示）
+            const ageCheckboxHtml = needsAge
+                ? `<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer;justify-content:center;">
+                     <input type="checkbox" id="age-check" style="width:18px;height:18px;">
+                     <span>私は18歳以上です</span>
+                   </label>`
+                : '';
+
+            // ボタンラベルの決定
+            let btnLabel: string;
+            if (!needsTerms && needsAge) {
+                btnLabel = '年齢確認する';
+            } else if (isReconsent) {
+                btnLabel = '更新された規約に同意する';
+            } else {
+                btnLabel = '規約に同意する';
+            }
+
+            // 年齢確認が必要な場合はボタンを初期無効化
+            const btnDisabled = needsAge ? 'disabled' : '';
+
+            agreementSection.innerHTML = `
+              ${noticeHtml}
+              ${ageCheckboxHtml}
+              <button id="agree-btn" ${btnDisabled} style="padding: 12px 24px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-bottom: 10px; opacity: ${needsAge ? '0.5' : '1'};">
+                ${btnLabel}
+              </button>
+            `;
+
+            // チェックボックスの変更でボタンの有効/無効を切り替え
+            if (needsAge) {
+                const ageCheck = document.getElementById('age-check') as HTMLInputElement | null;
+                const agreeBtn = document.getElementById('agree-btn') as HTMLButtonElement | null;
+                if (ageCheck && agreeBtn) {
+                    ageCheck.onchange = () => {
+                        agreeBtn.disabled = !ageCheck.checked;
+                        agreeBtn.style.opacity = ageCheck.checked ? '1' : '0.5';
+                    };
+                }
+            }
+
+            const agreeBtn = document.getElementById('agree-btn') as HTMLButtonElement | null;
             if (agreeBtn) {
                 agreeBtn.onclick = async () => {
-                    await handleAgreement(agreeBtn as HTMLButtonElement, userId, container);
+                    const ageCheck = document.getElementById('age-check') as HTMLInputElement | null;
+                    const ageVerified = hasAgeVerified || (ageCheck?.checked ?? false);
+                    await handleAgreement(agreeBtn, userId, container, ageVerified);
                 };
             }
         }
     }
 };
 
-const handleAgreement = async (btn: HTMLButtonElement, userId: string, container: HTMLElement) => {
+const handleAgreement = async (btn: HTMLButtonElement, userId: string, container: HTMLElement, ageVerified: boolean) => {
     if (!userId) {
         alert('ユーザーIDが取得できませんでした');
         return;
@@ -299,7 +346,7 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
                 'Content-Type': 'application/json',
                 'Authorization': authorizationHeader
             },
-            body: JSON.stringify({ agreed: true })
+            body: JSON.stringify({ agreed: true, age_verified: ageVerified })
         });
 
         if (response.status === 401) {
@@ -314,14 +361,14 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
             throw new Error(`API Error: ${response.status}`);
         }
 
-        alert('規約に同意しました');
+        alert('規約への同意と年齢確認が完了しました');
         const agreementSection = container.querySelector('#agreement-section');
         if (agreementSection) {
-            agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意済みです</p>';
+            agreementSection.innerHTML = '<p style="color: #06C755; font-weight: bold;">規約に同意・年齢確認済みです</p>';
         }
     } catch (e: unknown) {
         console.error('Agreement failed', e);
-        alert('規約への同意処理中にエラーが発生しました。もう一度お試しください。');
+        alert('処理中にエラーが発生しました。もう一度お試しください。');
         btn.disabled = false;
         btn.textContent = originalLabel;
     }
