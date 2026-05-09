@@ -1,5 +1,10 @@
 # Build stage
-FROM node:20-alpine as build
+FROM node:20.20.2-alpine as build
+
+# npm をメジャーバージョン 11 へアップデート（issue #14）
+# このリポジトリの package-lock.json は lockfileVersion 3（npm 9+ 形式）のため npm@11 でも再生成不要
+# Node および npm のバージョンを固定して Docker ビルドの再現性を高める
+RUN npm install -g npm@11.13.0 && rm -rf /root/.npm
 
 WORKDIR /app
 
@@ -10,7 +15,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM nginx:1.30.0-alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
