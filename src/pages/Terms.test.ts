@@ -620,6 +620,24 @@ describe('Terms Page', () => {
 
     expect(agreeBtn).not.toBeDisabled();
     expect(agreeBtn).toHaveStyle({ cursor: 'pointer' });
+
+    // ボタンをクリックすると ageVerified: true が /agreement に送信される
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ status: 'success' }),
+    });
+
+    agreeBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${mockApiBaseUrl}/api/users/${mockUserId}/agreement`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ agreed: true, ageVerified: true })
+      })
+    );
+    expect(container.innerHTML).toContain('規約に同意・年齢確認済みです');
   });
 
   it('age verification: no checkbox shown when ageVerifiedAt is already set', async () => {
