@@ -609,7 +609,7 @@ describe('Terms Page', () => {
     const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
     expect(agreeBtn).toBeInTheDocument();
     expect(agreeBtn).toBeDisabled();
-    expect(agreeBtn).toHaveStyle({ cursor: 'not-allowed' });
+    expect(agreeBtn.style.cursor).toBe('not-allowed');
 
     const ageCheck = container.querySelector('#age-check') as HTMLInputElement;
     expect(ageCheck).toBeInTheDocument();
@@ -619,7 +619,7 @@ describe('Terms Page', () => {
     ageCheck.dispatchEvent(new Event('change'));
 
     expect(agreeBtn).not.toBeDisabled();
-    expect(agreeBtn).toHaveStyle({ cursor: 'pointer' });
+    expect(agreeBtn.style.cursor).toBe('pointer');
 
     // ボタンをクリックすると ageVerified: true が /agreement に送信される
     (global.fetch as any).mockResolvedValueOnce({
