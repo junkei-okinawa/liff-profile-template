@@ -292,7 +292,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             agreementSection.innerHTML = `
               ${noticeHtml}
               ${ageCheckboxHtml}
-              <button id="agree-btn" ${btnDisabled} style="padding: 12px 24px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-bottom: 10px; opacity: ${needsAge ? '0.5' : '1'};">
+              <button id="agree-btn" ${btnDisabled} style="padding: 12px 24px; background: #06C755; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: ${needsAge ? 'not-allowed' : 'pointer'}; margin-bottom: 10px; opacity: ${needsAge ? '0.5' : '1'};">
                 ${btnLabel}
               </button>
             `;
@@ -305,6 +305,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                     ageCheck.onchange = () => {
                         agreeBtn.disabled = !ageCheck.checked;
                         agreeBtn.style.opacity = ageCheck.checked ? '1' : '0.5';
+                        agreeBtn.style.cursor = ageCheck.checked ? 'pointer' : 'not-allowed';
                     };
                 }
             }
