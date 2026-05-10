@@ -640,6 +640,30 @@ describe('Terms Page', () => {
     expect(container.innerHTML).toContain('規約に同意・年齢確認済みです');
   });
 
+  it('age verification: invalid ageVerifiedAt treated as unverified (fail-closed)', async () => {
+    // ageVerifiedAt が不正な日付文字列の場合は年齢未確認として扱う（フェイルクローズ）
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          termsAcceptedAt: new Date().toISOString(),
+          ageVerifiedAt: 'not-a-date',
+        }),
+      });
+
+    await renderTerms(container);
+
+    // チェックボックスが表示される（needsAge=true）
+    expect(container.querySelector('#age-check')).toBeInTheDocument();
+    // ボタンは disabled 状態（チェック前）
+    const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
+    expect(agreeBtn).toBeDisabled();
+  });
+
   it('age verification: no checkbox shown when ageVerifiedAt is already set', async () => {
     // ageVerifiedAt が設定済みの場合はチェックボックスが表示されない
     (global.fetch as any)
