@@ -344,7 +344,7 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
         const idToken = getAuthToken();
         const authorizationHeader = `Bearer ${idToken}`;
 
-        const response = await fetch(`${apiBaseUrl}/api/users/${userId}/agreement`, {
+        const response = await fetch(`${apiBaseUrl}/api/users/${encodeURIComponent(userId)}/agreement`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
