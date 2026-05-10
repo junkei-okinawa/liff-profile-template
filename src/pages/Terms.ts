@@ -238,7 +238,7 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             hasAgreed = false;
         }
 
-        // age_verified_at が設定済みであれば年齢確認済みとみなす（一度確認すれば以降不要）
+        // ageVerifiedAt が設定済みであれば年齢確認済みとみなす（一度確認すれば以降不要）
         hasAgeVerified = !!statusData.ageVerifiedAt;
 
     } catch (e) {
@@ -299,8 +299,8 @@ const checkAgreementStatus = async (container: HTMLElement) => {
 
             // チェックボックスの変更でボタンの有効/無効を切り替え
             if (needsAge) {
-                const ageCheck = document.getElementById('age-check') as HTMLInputElement | null;
-                const agreeBtn = document.getElementById('agree-btn') as HTMLButtonElement | null;
+                const ageCheck = agreementSection.querySelector<HTMLInputElement>('#age-check');
+                const agreeBtn = agreementSection.querySelector<HTMLButtonElement>('#agree-btn');
                 if (ageCheck && agreeBtn) {
                     ageCheck.onchange = () => {
                         agreeBtn.disabled = !ageCheck.checked;
@@ -310,10 +310,10 @@ const checkAgreementStatus = async (container: HTMLElement) => {
                 }
             }
 
-            const agreeBtn = document.getElementById('agree-btn') as HTMLButtonElement | null;
+            const agreeBtn = agreementSection.querySelector<HTMLButtonElement>('#agree-btn');
             if (agreeBtn) {
                 agreeBtn.onclick = async () => {
-                    const ageCheck = document.getElementById('age-check') as HTMLInputElement | null;
+                    const ageCheck = agreementSection.querySelector<HTMLInputElement>('#age-check');
                     const ageVerified = hasAgeVerified || (ageCheck?.checked ?? false);
                     await handleAgreement(agreeBtn, userId, container, ageVerified);
                 };
