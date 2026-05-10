@@ -238,8 +238,11 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             hasAgreed = false;
         }
 
-        // ageVerifiedAt が設定済みであれば年齢確認済みとみなす（一度確認すれば以降不要）
-        hasAgeVerified = !!statusData.ageVerifiedAt;
+        // ageVerifiedAt が有効な日付として存在する場合のみ確認済みとみなす（不正値はフェイルクローズ）
+        if (statusData.ageVerifiedAt) {
+            const ageVerifiedDate = new Date(statusData.ageVerifiedAt);
+            hasAgeVerified = !isNaN(ageVerifiedDate.getTime());
+        }
 
     } catch (e) {
         console.error('API check failed', e);
