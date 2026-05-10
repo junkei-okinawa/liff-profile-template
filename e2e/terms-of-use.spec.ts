@@ -20,6 +20,7 @@ test.beforeEach(async ({ page }) => {
 test('should allow user to agree to terms and maintain state on reload', async ({ page }) => {
     // Mock API State
     let isAgreed = false;
+    let isAgeVerified = false;
     const mockUserId = TEST_USER_ID;
 
     // Mock GET /api/users/{userId}/status
@@ -32,7 +33,7 @@ test('should allow user to agree to terms and maintain state on reload', async (
                 userId: mockUserId,
                 agreed: isAgreed,
                 termsAcceptedAt: isAgreed ? now : null,
-                ageVerifiedAt: isAgreed ? now : null
+                ageVerifiedAt: isAgeVerified ? now : null
             })
         });
     });
@@ -42,6 +43,7 @@ test('should allow user to agree to terms and maintain state on reload', async (
         const body = route.request().postDataJSON();
         if (body && body.agreed) {
             isAgreed = true;
+            if (body.ageVerified) isAgeVerified = true;
             const now = new Date().toISOString();
             await route.fulfill({
                 status: 200,
@@ -51,7 +53,7 @@ test('should allow user to agree to terms and maintain state on reload', async (
                     userId: mockUserId,
                     agreed: true,
                     termsAcceptedAt: now,
-                    ageVerifiedAt: body.ageVerified ? now : null
+                    ageVerifiedAt: isAgeVerified ? now : null
                 })
             });
         } else {
