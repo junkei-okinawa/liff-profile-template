@@ -317,6 +317,8 @@ const checkAgreementStatus = async (container: HTMLElement) => {
             if (agreeBtn) {
                 agreeBtn.onclick = async () => {
                     const ageCheck = agreementSection.querySelector<HTMLInputElement>('#age-check');
+                    // needsAge=true のとき未チェックのままDOMを操作してボタンを有効化した場合のガード
+                    if (needsAge && !ageCheck?.checked) return;
                     const ageVerified = hasAgeVerified || (ageCheck?.checked ?? false);
                     await handleAgreement(agreeBtn, userId, container, ageVerified);
                 };
