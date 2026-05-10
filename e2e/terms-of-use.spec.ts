@@ -20,17 +20,20 @@ test.beforeEach(async ({ page }) => {
 test('should allow user to agree to terms and maintain state on reload', async ({ page }) => {
     // Mock API State
     let isAgreed = false;
+    let isAgeVerified = false;
     const mockUserId = TEST_USER_ID;
 
     // Mock GET /api/users/{userId}/status
     await page.route(`**/api/users/${mockUserId}/status`, async route => {
+        const now = new Date().toISOString();
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
                 userId: mockUserId,
                 agreed: isAgreed,
-                termsAcceptedAt: isAgreed ? new Date().toISOString() : null
+                termsAcceptedAt: isAgreed ? now : null,
+                ageVerifiedAt: isAgeVerified ? now : null
             })
         });
     });
@@ -40,6 +43,8 @@ test('should allow user to agree to terms and maintain state on reload', async (
         const body = route.request().postDataJSON();
         if (body && body.agreed) {
             isAgreed = true;
+            if (body.ageVerified) isAgeVerified = true;
+            const now = new Date().toISOString();
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
@@ -47,7 +52,8 @@ test('should allow user to agree to terms and maintain state on reload', async (
                     status: 'success',
                     userId: mockUserId,
                     agreed: true,
-                    termsAcceptedAt: new Date().toISOString()
+                    termsAcceptedAt: now,
+                    ageVerifiedAt: isAgeVerified ? now : null
                 })
             });
         } else {
@@ -79,17 +85,18 @@ test('should allow user to agree to terms and maintain state on reload', async (
     await page.getByRole('link', { name: '利用規約' }).click();
     await expect(page).toHaveURL(/\/terms-of-use/);
 
-    // 3. Agree to Terms
+    // 3. Agree to Terms (age verification checkbox must be checked first)
     const agreeBtn = page.getByRole('button', { name: '規約に同意する' });
     await expect(agreeBtn).toBeVisible();
 
+    await page.locator('#age-check').check();
     await agreeBtn.click();
 
     // 4. Verify Success
-    await expect(page.getByText('規約に同意済みです')).toBeVisible();
+    await expect(page.getByText('規約に同意・年齢確認済みです')).toBeVisible();
 
     // 5. Verify agreed state persists (reload)
     await page.reload();
     await expect(agreeBtn).not.toBeVisible();
-    await expect(page.getByText('規約に同意済みです')).toBeVisible();
+    await expect(page.getByText('規約に同意・年齢確認済みです')).toBeVisible();
 });

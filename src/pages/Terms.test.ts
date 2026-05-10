@@ -110,6 +110,7 @@ describe('Terms Page', () => {
 
   it('shows agreed message when termsAcceptedAt equals TERMS_UPDATED_AT (boundary: no re-consent)', async () => {
     // TERMS_UPDATED_AT と同日の同意日は「ちょうど同意済み」= 再同意不要
+    // 年齢確認も済んでいる場合に完了メッセージが表示されることを確認
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
@@ -117,33 +118,41 @@ describe('Terms Page', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ termsAcceptedAt: TERMS_UPDATED_AT }),
+        json: () => Promise.resolve({
+          termsAcceptedAt: TERMS_UPDATED_AT,
+          ageVerifiedAt: new Date().toISOString(),
+        }),
       });
 
     await renderTerms(container);
 
-    expect(container.innerHTML).toContain('規約に同意済みです');
+    expect(container.innerHTML).toContain('規約に同意・年齢確認済みです');
     expect(container.querySelector('#agree-btn')).not.toBeInTheDocument();
     expect(container.innerHTML).not.toContain('利用規約が更新されました');
   });
 
-  it('handles agreement action correctly', async () => {
-    // Mock fetch for terms.md
+  it('handles agreement action correctly (age verified, terms pending)', async () => {
+    // 年齢確認済みだが規約未同意のユーザーが同意ボタンをクリックする正常系
+    // - ボタンは有効（ageVerifiedAt 設定済みのため）
+    // - POST ボディに ageVerified: true が含まれる（hasAgeVerified=true のため）
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve('# Terms'),
       })
-      // Mock fetch for status API (termsAcceptedAt なし = 未同意)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ termsAcceptedAt: null }),
+        json: () => Promise.resolve({
+          termsAcceptedAt: null,
+          ageVerifiedAt: new Date().toISOString(),
+        }),
       });
 
     await renderTerms(container);
 
     const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
     expect(agreeBtn).toBeInTheDocument();
+    expect(agreeBtn).not.toBeDisabled();
 
     // Mock fetch for agreement POST
     (global.fetch as any).mockResolvedValueOnce({
@@ -157,25 +166,26 @@ describe('Terms Page', () => {
     // Wait for async operations (click handler is async)
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    // Check if agreement API was called with correct headers
+    // Check if agreement API was called with correct body (ageVerified: true because hasAgeVerified=true)
     expect(global.fetch).toHaveBeenCalledWith(
-      `${mockApiBaseUrl}/api/users/${mockUserId}/agreement`,
+      `${mockApiBaseUrl}/api/users/${encodeURIComponent(mockUserId)}/agreement`,
       expect.objectContaining({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${mockIdToken}`
         },
-        body: JSON.stringify({ agreed: true })
+        body: JSON.stringify({ agreed: true, ageVerified: true })
       })
     );
 
-    // Check if UI updated
-    expect(container.innerHTML).toContain('規約に同意済みです');
+    // Check if UI updated to completion message
+    expect(container.innerHTML).toContain('規約に同意・年齢確認済みです');
   });
 
   it('shows session expired auto-logout when agreement POST returns 401', async () => {
     // 利用規約を読んでいる間にトークンが切れて POST /agreement が 401 を返すケース
+    // 年齢確認済み（ageVerifiedAt 設定）のためボタンは有効状態
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
@@ -183,7 +193,10 @@ describe('Terms Page', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ termsAcceptedAt: null }),
+        json: () => Promise.resolve({
+          termsAcceptedAt: null,
+          ageVerifiedAt: new Date().toISOString(),
+        }),
       });
 
     await renderTerms(container);
@@ -245,25 +258,25 @@ describe('Terms Page', () => {
   });
 
   it('shows agreed message when termsAcceptedAt is newer than TERMS_UPDATED_AT', async () => {
-    // Mock fetch for terms.md
+    // 利用規約更新日より新しい同意日かつ年齢確認済みの場合に完了メッセージが表示される
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve('# Terms'),
       })
-      // 利用規約更新日より新しい同意日を返す
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
           // TERMS_UPDATED_AT より 1 日後: 環境変数で更新日が変わっても相対的に「新しい」ことを保証
           termsAcceptedAt: new Date(new Date(TERMS_UPDATED_AT).getTime() + 24 * 60 * 60 * 1000).toISOString(),
+          ageVerifiedAt: new Date().toISOString(),
         }),
       });
 
     await renderTerms(container);
 
-    // 同意済みメッセージが表示される
-    expect(container.innerHTML).toContain('規約に同意済みです');
+    // 同意・年齢確認済みメッセージが表示される
+    expect(container.innerHTML).toContain('規約に同意・年齢確認済みです');
     expect(container.querySelector('#agree-btn')).not.toBeInTheDocument();
   });
 
@@ -577,6 +590,133 @@ describe('Terms Page', () => {
     topBtn.click();
     bottomBtn.click();
     expect(liff.logout).toHaveBeenCalledTimes(1); // 重複しない
+  });
+
+  it('age verification: agree button is disabled until checkbox is checked', async () => {
+    // needsAge=true のとき同意ボタンが disabled で始まり、チェック後に有効化される
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ termsAcceptedAt: null, ageVerifiedAt: null }),
+      });
+
+    await renderTerms(container);
+
+    const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
+    expect(agreeBtn).toBeInTheDocument();
+    expect(agreeBtn).toBeDisabled();
+    expect(agreeBtn.style.cursor).toBe('not-allowed');
+
+    const ageCheck = container.querySelector('#age-check') as HTMLInputElement;
+    expect(ageCheck).toBeInTheDocument();
+
+    // チェックボックスにチェックを入れるとボタンが有効化される
+    ageCheck.checked = true;
+    ageCheck.dispatchEvent(new Event('change'));
+
+    expect(agreeBtn).not.toBeDisabled();
+    expect(agreeBtn.style.cursor).toBe('pointer');
+
+    // ボタンをクリックすると ageVerified: true が /agreement に送信される
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ status: 'success' }),
+    });
+
+    agreeBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${mockApiBaseUrl}/api/users/${encodeURIComponent(mockUserId)}/agreement`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ agreed: true, ageVerified: true })
+      })
+    );
+    expect(container.innerHTML).toContain('規約に同意・年齢確認済みです');
+  });
+
+  it('age verification: invalid ageVerifiedAt treated as unverified (fail-closed)', async () => {
+    // ageVerifiedAt が不正な日付文字列の場合は年齢未確認として扱う（フェイルクローズ）
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          termsAcceptedAt: new Date().toISOString(),
+          ageVerifiedAt: 'not-a-date',
+        }),
+      });
+
+    await renderTerms(container);
+
+    // チェックボックスが表示される（needsAge=true）
+    expect(container.querySelector('#age-check')).toBeInTheDocument();
+    // ボタンは disabled 状態（チェック前）
+    const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
+    expect(agreeBtn).toBeDisabled();
+  });
+
+  it('age verification: no checkbox shown when ageVerifiedAt is already set', async () => {
+    // ageVerifiedAt が設定済みの場合はチェックボックスが表示されない
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          termsAcceptedAt: null,
+          ageVerifiedAt: new Date().toISOString(),
+        }),
+      });
+
+    await renderTerms(container);
+
+    expect(container.querySelector('#age-check')).not.toBeInTheDocument();
+    // ボタンは有効（年齢確認不要のため）
+    const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
+    expect(agreeBtn).toBeInTheDocument();
+    expect(agreeBtn).not.toBeDisabled();
+    expect(agreeBtn).toHaveTextContent('規約に同意する');
+  });
+
+  it('age verification: shows age-only form for existing user (terms ok, age pending)', async () => {
+    // 規約は同意済み・年齢確認のみ未完了の場合、年齢確認専用の通知とボタンが表示される
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('# Terms'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          termsAcceptedAt: new Date().toISOString(),
+          ageVerifiedAt: null,
+        }),
+      });
+
+    await renderTerms(container);
+
+    // 年齢確認通知が表示される
+    expect(container.innerHTML).toContain('年齢確認が必要です');
+    // チェックボックスが表示される
+    expect(container.querySelector('#age-check')).toBeInTheDocument();
+    // ボタンラベルが「年齢確認する」
+    const agreeBtn = container.querySelector('#agree-btn') as HTMLButtonElement;
+    expect(agreeBtn).toHaveTextContent('年齢確認する');
+    // 最初は無効
+    expect(agreeBtn).toBeDisabled();
+    // 再同意通知は表示されない
+    expect(container.innerHTML).not.toContain('利用規約が更新されました');
   });
 
   it('back button navigates to profile page via replaceState', async () => {
