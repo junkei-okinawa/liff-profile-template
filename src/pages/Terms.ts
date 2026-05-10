@@ -347,7 +347,7 @@ const handleAgreement = async (btn: HTMLButtonElement, userId: string, container
                 'Content-Type': 'application/json',
                 'Authorization': authorizationHeader
             },
-            body: JSON.stringify({ agreed: true, age_verified: ageVerified })
+            body: JSON.stringify({ agreed: true, ageVerified: ageVerified })
         });
 
         if (response.status === 401) {

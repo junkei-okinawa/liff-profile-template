@@ -133,8 +133,8 @@ describe('Terms Page', () => {
 
   it('handles agreement action correctly (age verified, terms pending)', async () => {
     // 年齢確認済みだが規約未同意のユーザーが同意ボタンをクリックする正常系
-    // - ボタンは有効（age_verified_at 設定済みのため）
-    // - POST ボディに age_verified: true が含まれる（hasAgeVerified=true のため）
+    // - ボタンは有効（ageVerifiedAt 設定済みのため）
+    // - POST ボディに ageVerified: true が含まれる（hasAgeVerified=true のため）
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: true,
@@ -166,7 +166,7 @@ describe('Terms Page', () => {
     // Wait for async operations (click handler is async)
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    // Check if agreement API was called with correct body (age_verified: true because hasAgeVerified=true)
+    // Check if agreement API was called with correct body (ageVerified: true because hasAgeVerified=true)
     expect(global.fetch).toHaveBeenCalledWith(
       `${mockApiBaseUrl}/api/users/${mockUserId}/agreement`,
       expect.objectContaining({
@@ -175,7 +175,7 @@ describe('Terms Page', () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${mockIdToken}`
         },
-        body: JSON.stringify({ agreed: true, age_verified: true })
+        body: JSON.stringify({ agreed: true, ageVerified: true })
       })
     );
 
