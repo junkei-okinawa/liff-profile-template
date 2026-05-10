@@ -168,7 +168,7 @@ describe('Terms Page', () => {
 
     // Check if agreement API was called with correct body (ageVerified: true because hasAgeVerified=true)
     expect(global.fetch).toHaveBeenCalledWith(
-      `${mockApiBaseUrl}/api/users/${mockUserId}/agreement`,
+      `${mockApiBaseUrl}/api/users/${encodeURIComponent(mockUserId)}/agreement`,
       expect.objectContaining({
         method: 'POST',
         headers: {
@@ -631,7 +631,7 @@ describe('Terms Page', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(global.fetch).toHaveBeenCalledWith(
-      `${mockApiBaseUrl}/api/users/${mockUserId}/agreement`,
+      `${mockApiBaseUrl}/api/users/${encodeURIComponent(mockUserId)}/agreement`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ agreed: true, ageVerified: true })
